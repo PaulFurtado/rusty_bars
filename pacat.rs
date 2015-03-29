@@ -1,6 +1,4 @@
 #![allow(unstable)]
-#![feature(link_args)]
-
 
 // TODO: Automatically get default sink
 
@@ -16,7 +14,8 @@ use std::io::stdio;
 use libc::funcs::c95::string::strlen;
 
 
-#[link_args = "-lpulse-simple -lpulse"]
+#[link(name="pulse-simple")]
+#[link(name="pulse")]
 extern {
     fn pa_simple_new(
         server: *const c_char,
