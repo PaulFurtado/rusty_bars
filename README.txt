@@ -2,10 +2,11 @@ to compile:
     rustc pacat.rs
 
 to find your <device name>:
-    pactl info | grep 'Default Sink'
+    export DEFAULT_SINK=$(pactl info | grep 'Default Sink' | cut -b 15-)
+    echo $DEFAULT_SINK
 
 to record to stdout:
-    ./pacat <device name>.monitor
+    cargo run record "$DEFAULT_SINK".monitor
 
 to play form a recorded file:
-    <testaudio ./pacat <device_name>
+    cargo run play "$DEFAULT_SINK" <src/testaudio
