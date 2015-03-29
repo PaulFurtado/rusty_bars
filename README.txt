@@ -1,5 +1,5 @@
 to compile:
-    rustc pacat.rs
+    cargo build
 
 to find your <device name>:
     export DEFAULT_SINK=$(pactl info | grep 'Default Sink' | cut -b 15-)
