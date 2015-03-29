@@ -5,57 +5,74 @@ extern crate libc;
 
 use self::libc::{c_int, c_char, size_t};
 use std::ptr;
-use std::io::File;
-use std::path::Path;
 use std::os;
 use  std::mem::transmute;
 use std::ffi::CString;
 use  std::str::from_utf8;
-use std::io::fs::PathExtensions;
 use std::io::stdio;
+use libc::funcs::c95::string::strlen;
+
 
 #[link_args = "-lpulse-simple -lpulse"]
 extern {
-  fn pa_simple_new(server: *const c_char,
-                   name: *const c_char,
-                   dir: c_int,
-                   dev: *const c_char,
-                   steam_name: *const c_char,
-                   sample_spec: *const pa_sample_spec,
-                   channel_map: *const u8,
-                   attr: *const u8,
-                   error: *mut c_int) -> *mut pa_simple;
+    fn pa_simple_new(
+        server: *const c_char,
+        name: *const c_char,
+        dir: c_int,
+        dev: *const c_char,
+        steam_name: *const c_char,
+        sample_spec: *const PulseSampleSpec,
+        channel_map: *const u8,
+        attr: *const u8,
+        error: *mut c_int
+    ) -> *mut PaSimpleC;
 
-  fn pa_simple_free(pa: *mut pa_simple);
+    fn pa_simple_free(pa: *mut PaSimpleC);
 
-  fn pa_simple_write(pa: *mut pa_simple,
-                     data: *const u8,
-                     bytes: size_t,
-                     error: *mut c_int) -> c_int;
+    fn pa_simple_write(
+        pa: *mut PaSimpleC,
+        data: *const u8,
+        bytes: size_t,
+        error: *mut c_int
+    ) -> c_int;
 
-    fn pa_simple_read(pa: *mut pa_simple, data: *mut u8, bytes: size_t, error: *mut c_int) -> c_int;
+    fn pa_simple_read(
+        pa: *mut PaSimpleC,
+        data: *mut u8,
+        bytes: size_t,
+        error: *mut c_int
+    ) -> c_int;
 
 
-  fn pa_simple_drain(pa: *mut pa_simple,
-                     error: *mut c_int) -> c_int;
+    fn pa_simple_drain(
+        pa: *mut PaSimpleC,
+        error: *mut c_int
+    ) -> c_int;
 
-  fn pa_strerror(error: c_int) -> *const c_char;
+    fn pa_strerror(error: c_int) -> *const c_char;
 }
 
-// typedef struct pa_simple pa_simple
-pub struct pa_simple;
 
-// defined as enum pa_stream_direction
-//pub static PA_STREAM_NODIRECTION: c_int = 0_i32;
-pub static PA_STREAM_PLAYBACK:    c_int = 1_i32;
-pub static PA_STREAM_RECORD:      c_int = 2_i32;
-//pub static PA_STREAM_UPLOAD:      c_int = 3_i32;
+#[repr(C)]
+#[derive(Copy)]
+pub struct PaSimpleC;
+
+
+#[derive(Copy,Clone)]
+pub enum StreamDirection {
+    NoDirection,
+    StreamPlayback,
+    StreamRecord,
+    StreamUpload
+}
 
 // see pa_sample_format
 pub static PA_SAMPLE_S16LE: c_int = 3_i32;
 
-// see pulse/def.h
-pub struct pa_sample_spec {
+
+#[derive(Copy)]
+#[repr(C)]
+pub struct PulseSampleSpec {
   format: c_int,
   rate: u32,
   channels: u8
@@ -63,131 +80,156 @@ pub struct pa_sample_spec {
 
 
 
-// --------------------
-pub fn pa_new(pa_name: &str, stream_name: &str) -> Box<*mut pa_simple> {
-  unsafe {
-    let mut err: c_int = 0;
-
-    let s_spec = pa_sample_spec{
-                      format: PA_SAMPLE_S16LE,
-                      rate: 44100,
-                      channels: 2};
-
-    let pa_name_c = CString::from_slice(pa_name.as_bytes());
-    let stream_name_c = CString::from_slice(stream_name.as_bytes());
-    let dev_c = CString::from_slice("alsa_output.usb-NuForce__Inc._NuForce___DAC_2-01-N2.analog-stereo.monitor".as_bytes());
-
-    let pa = pa_simple_new(
-                  ptr::null(),
-                  pa_name_c.as_ptr(),
-                  PA_STREAM_RECORD,
-                  dev_c.as_ptr(),
-                  stream_name_c.as_ptr(),
-                  transmute(&s_spec),
-                  ptr::null(),
-                  ptr::null(),
-                  &mut err);
-    if ( err != 0 ) {
-      //panic!("err code {} from pulse: '{}'", err, from_utf8(transmute(pa_strerror(err))).unwrap() );
-      panic!("err code {} from pulse", err );
-    }
-    Box::new(pa) // cast to region pointer, owning pointer
-  }
-}
-
-//---------------------------------------------
-
-pub fn record(pa: Box<*mut pa_simple>) -> bool {
-    static BUFSIZE: usize = 1024us;
-    let mut buffer = [0u8; 1024];
-    let mut err: c_int = 0;
-    let mut stdout = stdio::stdout();
-
-    loop {
-         let r_res = unsafe {pa_simple_read(*pa, buffer.as_mut_ptr(), buffer.len() as size_t, &mut err) };
-
-         if ( r_res < 0) {
-            //println!("ERROR code {} from pulse: \"{}\"",
-            //         err,  from_utf8(pa_strerror(err)).unwrap());
-            println!("errr code {} from pulse", err);
-            return false;
+fn pa_err_to_string(err: c_int) -> Result<(), String> {
+    if err == 0 {
+        Ok(())
+    } else {
+        unsafe {
+            let err_msg_ptr: *const c_char = pa_strerror(err);
+            let size = strlen(err_msg_ptr) as usize;
+            let slice: Vec<u8> = Vec::from_raw_buf((err_msg_ptr as *const u8), size);
+            Err(String::from_utf8(slice).unwrap())
         }
+    }
+}
 
-        stdout.write(&buffer).unwrap();
 
+
+pub struct PulseSimple {
+    pa: *mut PaSimpleC
+}
+
+
+impl PulseSimple {
+
+    pub fn new(device: &str, mode: StreamDirection, sample_spec: &PulseSampleSpec) -> Result<PulseSimple, String> {
+        let pa_name_c = CString::from_slice("rustviz".as_bytes());
+        let stream_name_c = CString::from_slice("playback".as_bytes());
+        let dev_c = CString::from_slice(device.as_bytes());
+        let mut err: c_int = 0;
+
+        let pa = unsafe {
+            pa_simple_new(
+              ptr::null(),
+              pa_name_c.as_ptr(),
+              mode as c_int,
+              dev_c.as_ptr(),
+              stream_name_c.as_ptr(),
+              transmute(sample_spec),
+              ptr::null(),
+              ptr::null(),
+              &mut err
+            )
+        };
+
+        try!(pa_err_to_string(err));
+        Ok(PulseSimple{pa: pa})
+    }
+
+
+    pub fn read(&mut self, buffer: &mut [u8]) -> Result<(), String> {
+        let mut err: c_int = 0;
+        unsafe { pa_simple_read(
+            self.pa,
+            buffer.as_mut_ptr(),
+            buffer.len() as size_t,
+            &mut err
+        ) };
+
+        pa_err_to_string(err)
+    }
+
+    pub fn write(&mut self, buffer: &[u8], count: size_t) -> Result<(), String> {
+        let mut err: c_int = 0;
+        unsafe { pa_simple_write(
+            self.pa,
+            buffer.as_ptr(),
+            count as size_t,
+            &mut err
+        ) };
+
+        pa_err_to_string(err)
+    }
+
+    pub fn drain(&mut self) -> Result<(), String> {
+        let mut err: c_int = 0;
+        unsafe { pa_simple_drain(self.pa, &mut err) };
+        pa_err_to_string(err)
     }
 
 }
 
 
+impl Drop for PulseSimple {
+    fn drop(&mut self) {
+        unsafe { pa_simple_free(self.pa); };
+    }
+}
 
-pub fn play_file(pa: Box<*mut pa_simple>, path: &Path) -> bool {
-  if ( !path.is_file() ) {
-    println!("This is not a file!");
-    return false;
-  }
 
-  println!("Gonna play: {}", path.as_str().unwrap());
 
-  let mut err: c_int = 0;
-  let mut file_reader = File::open(path);
-  unsafe {
-    static BUFSIZE: usize = 1024us;
+fn main() {
+    let args = os::args();
+    if args.len() != 3 {
+        panic!("
+            I need a mode an and a device.
+            Ex: <binary_name> <play|record> <device_name>
+
+        ");
+    }
+    let mode_str = args[1].clone();
+
+    let sample_spec = PulseSampleSpec{
+        format: PA_SAMPLE_S16LE,
+        rate: 44100,
+        channels: 2
+    };
+
+
+    let mode: StreamDirection = if mode_str == "play" {
+        StreamDirection::StreamPlayback
+    } else if mode_str == "record" {
+        StreamDirection::StreamRecord
+    } else {
+        panic!("Invalid mode!");
+    };
+
+    let dev = args[2].clone();
+
+
+    let mut pulse = PulseSimple::new(dev.as_slice(), mode, &sample_spec).unwrap();
     let mut buffer = [0u8; 1024];
-    let mut total_read = 0us;
-    loop {
-      let b_read = match file_reader.read(&mut buffer) {
-        Err(x) => break, // eof
-        Ok(s) => s//read smth
-      };
-      let w_res = pa_simple_write(
-                    *pa,
-                    buffer.as_ptr(),
-                    b_read as size_t,
-                    &mut err);
-      if ( w_res < 0) {
-        //println!("ERROR code {} from pulse: \"{}\"",
-        //         err,  from_utf8(pa_strerror(err)).unwrap());
-        println!("errr code {} from pulse", err);
-        return false;
-      }
-      total_read += b_read;
+    let mut stdout = stdio::stdout();
+    let mut stdin = stdio::stdin();
+
+    match mode {
+        StreamDirection::StreamPlayback => {
+            loop {
+                match stdin.read(&mut buffer) {
+                    Ok(count) => {
+                        pulse.write(&buffer, count as u64).unwrap();
+                    },
+                    Err(err) => {
+                        println!("read error: {}", err);
+                        break;
+                    }
+                }
+            }
+        }
+        StreamDirection::StreamRecord => {
+            loop {
+                pulse.read(&mut buffer).unwrap();
+                stdout.write(&buffer).unwrap();
+            }
+        }
+        _ => {
+            panic!("not implemented");
+        }
     }
-    println!("bytes read: {}", total_read);
 
-    pa_simple_drain(*pa, &mut err);
-  }
-  true
-}
+   match mode {
+     StreamDirection::StreamPlayback => { pulse.drain().unwrap(); },
+     _ => {}
+    }
 
-//---------------------------------------------
-
-pub fn free_pa(pa: Box<*mut pa_simple>) {
-  unsafe {
-    pa_simple_free(*pa);
-  }
-}
-
-//---------------------------------------------
-
-fn main()
-{
-  let args = os::args();
-  if ( args.len() != 2 ) {
-    panic!("BAAHH I need a file to play as a parameter.");
-  }
-  let f_name = args[1].clone();
-
-  let path = Path::new(f_name);
-  let pa_name = "rust_simple_pulse";
-  let stream_name  = "rust_playback";
-
-  let pa = pa_new(pa_name, stream_name);
-
-
-  if ( !record(pa) )
-  {
-    panic!("Dude I was not able to record the file.");
-  }
-  //free_pa(pa);
 }
