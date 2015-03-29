@@ -7,9 +7,9 @@ extern crate libc;
 use self::libc::{c_int, c_char, size_t};
 use std::ptr;
 use std::os;
-use  std::mem::transmute;
+use std::mem::transmute;
 use std::ffi::CString;
-use  std::str::from_utf8;
+use std::str::from_utf8;
 use std::io::stdio;
 use libc::funcs::c95::string::strlen;
 
