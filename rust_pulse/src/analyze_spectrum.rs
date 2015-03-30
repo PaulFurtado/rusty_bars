@@ -4,6 +4,7 @@ extern crate libc;
 use self::libc::{c_int};
 use std::num::Float;
 use std::f64::consts::PI;
+use std::f64;
 
 /*
 This module is responsible for a number of tasks:
@@ -181,7 +182,7 @@ impl<'a> AudioFFT<'a> {
     /// the power spectrum. (Ex: an equalizer visualizer).
     /// This function may need some work.
     fn get_output(&self) -> Vec<f64> {
-        // FFT is symmetric over its center so half the values are good enough
+        // Conver the FFT data into decibals (power)
         let power:Vec<f64> = self.output.iter().map(|x| 20.0 * x.abs().log10()).collect();
         let band_size = power.len() / self.bands;
         let mut out: Vec<f64> = Vec::new();
@@ -191,14 +192,20 @@ impl<'a> AudioFFT<'a> {
             out.push(0f64);
         }
 
+        // Sum the bands
         for (i, &val) in power.iter().enumerate() {
             // i/band_size is kinda dirty. Maybe loop through bands and take
             // slices instead?
             out[i/band_size] += val;
         }
 
+        // divide by band size to get mean
         for v in out.iter_mut() {
-            *v = *v/(band_size as f64);
+            if *v == f64::NEG_INFINITY {
+                *v = 0.0;
+            } else {
+                *v = *v/(band_size as f64);
+            }
         }
 
 

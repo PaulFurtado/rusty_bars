@@ -185,7 +185,7 @@ fn run_analyzer(dev: &str) {
 
 
     let mut pulse = PulseSimple::new(dev, StreamDirection::StreamRecord, &sample_spec).unwrap();
-    let mut fft = analyze_spectrum::AudioFFT::new(1024, 2, 44100, 32);
+    let mut fft = analyze_spectrum::AudioFFT::new(2048, 2, 44100, 32);
 
     let mut buffer_vec: Vec<u8> = Vec::with_capacity(fft.get_buf_size());
     for _ in range(0, fft.get_buf_size()) {
