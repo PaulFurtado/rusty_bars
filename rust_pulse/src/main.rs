@@ -198,7 +198,7 @@ fn run_analyzer(dev: &str) {
         let output = fft.execute(buffer);
 
         let temp: Vec<String> = output.iter().map(|x| format!("{}", x)).collect();
-        println!("output: {}", temp.connect(", "));
+        println!("{}", temp.connect(", "));
     }
 }
 
