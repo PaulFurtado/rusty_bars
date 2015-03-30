@@ -15,6 +15,8 @@ def main(window):
 
     while True:
         line = sys.stdin.readline().strip()
+        if 'Running' in line:
+            continue
         if not line:
             return
         fft_avgs = [float(x.strip()) for x in line.split(',')]

@@ -7,3 +7,6 @@ to find your <device name>:
 
 to run:
     cargo run "$DEFAULT_SINK".monitor
+
+to pipe to python viz:
+    cargo run $DEFAULT_SINK.monitor | python2 src/view.py
