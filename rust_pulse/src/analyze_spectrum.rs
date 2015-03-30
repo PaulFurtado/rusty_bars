@@ -3,6 +3,7 @@
 extern crate libc;
 use self::libc::{c_int, c_char, size_t};
 use std::num::Float;
+use std::f64::consts::PI;
 
 /*
 This module is responsible for a number of tasks:
@@ -12,6 +13,10 @@ This module is responsible for a number of tasks:
 4. Compute the FFT
 5. Compute the equalizer bands from the FFT output
 */
+
+
+// make sure we're as good as this asshole:
+// http://www.swharden.com/blog/2013-05-09-realtime-fft-audio-visualization-with-python/
 
 
 const FFT_SIZE: usize = 1024;
@@ -72,12 +77,16 @@ impl<'a> AudioFFT<'a> {
         // input is the input array to the fft, output is where the fft puts its
         // output
         let mut input: Vec<f64> = Vec::with_capacity(n);
-        let mut output: Vec<FftwComplex> = Vec::with_capacity(n);
+        let mut output: Vec<FftwComplex> = Vec::with_capacity(n/2);
 
-        for i in range(0, n) {
+        for _ in range(0, n) {
             input.push(0f64);
-            output.push(FftwComplex{im:0f64,re:0f64});
         }
+        for _ in range(0, n/2) {
+             output.push(FftwComplex{im:0f64,re:0f64});
+        }
+
+
 
         let plan = unsafe { ext::fftw_plan_dft_r2c_1d(n as i32, input.as_mut_ptr(), output.as_mut_ptr(), FFTW_ESTIMATE)};
 
@@ -127,21 +136,44 @@ impl<'a> AudioFFT<'a> {
         }
     }
 
+    fn do_hanning_window(&self, channel_data: &mut Vec<f64>) {
+        let divider: f64 = (channel_data.len() - 1) as f64;
+
+        for (i, val) in channel_data.iter_mut().enumerate() {
+            let cos_inner: f64 = 2.0 * PI * (i as f64) / divider;
+            let cos_part: f64 = cos_inner.cos();
+            let multiplier: f64 = 0.5 * (1.0 - cos_part);
+            //println!("mult: {}, cos: {}, cosi: {}", multiplier, cos_part, cos_inner);
+            *val = *val * multiplier;
+        }
+
+    }
+
+
     fn get_output(&self) -> Vec<f64> {
         // FFT is symmetric over its center so half the values are good enough
-        let power:Vec<f64> = self.output.slice_to(self.n/2).iter().map(|x| 20.0 * x.abs().log10()).collect();
+        let power:Vec<f64> = self.output.iter().map(|x| 20.0 * x.abs().log10()).collect();
         let band_size = power.len() / self.bands;
         let mut out: Vec<f64> = Vec::new();
+
 
         for _ in range(0, self.bands) {
             out.push(0f64);
         }
 
         for (i, &val) in power.iter().enumerate() {
-            out[i/band_size] += val / band_size as f64;
+            // i/band_size is kinda dirty. Maybe loop through bands and take
+            // slices instead?
+            out[i/band_size] += val;
         }
 
+        for v in out.iter_mut() {
+            *v = *v/(band_size as f64);
+        }
+
+
         out
+        //power
     }
 
     pub fn execute(&mut self, buffer: &[u8]) -> Vec<f64> {
@@ -149,8 +181,10 @@ impl<'a> AudioFFT<'a> {
             panic!("incorrect buffer length");
         }
         let all_floats = self.get_floats(buffer);
-        let channel_data = self.split_channels(&all_floats);
+        let mut channel_data = self.split_channels(&all_floats);
+        self.do_hanning_window(&mut channel_data[0]);
         self.load_channel(&channel_data[0]);
+
         unsafe { ext::fftw_execute(self.plan) };
         self.get_output()
     }

@@ -340,7 +340,7 @@ fn main() {
             }
         },
         StreamDirection::StreamRecord => {
-            let mut fft = analyze_spectrum::AudioFFT::new(1024, 2, 44100, 16);
+            let mut fft = analyze_spectrum::AudioFFT::new(1024, 2, 44100, 32);
 
             let mut buffer_vec: Vec<u8> = Vec::with_capacity(fft.get_buf_size());
             for _ in range(0, fft.get_buf_size()) {
