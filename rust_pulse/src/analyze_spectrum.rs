@@ -196,7 +196,10 @@ impl<'a> AudioFFT<'a> {
         for (i, &val) in power.iter().enumerate() {
             // i/band_size is kinda dirty. Maybe loop through bands and take
             // slices instead?
-            out[i/band_size] += val;
+            let index = i/band_size;
+            if index < out.len() {
+                out[index] += val;
+            }
         }
 
         // divide by band size to get mean
