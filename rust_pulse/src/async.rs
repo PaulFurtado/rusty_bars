@@ -18,10 +18,15 @@ use std::ffi::CString;
 
 
 #[allow(non_camel_case_types)]
+#[repr(C)]
 pub struct pa_mainloop;
+#[repr(C)]
 pub struct pa_mainloop_api;
+#[repr(C)]
 pub struct pa_context;
+#[repr(C)]
 pub struct pa_spawn_api;
+#[repr(C)]
 pub enum pa_context_state {
     UNCONNECTED,  // 	The context hasn't been connected yet.
     CONNECTING,   //	A connection is being established.
@@ -41,7 +46,7 @@ extern {
     fn pa_mainloop_get_api(m: *mut pa_mainloop) -> *mut pa_mainloop_api;
     fn pa_context_new(mainloop: *mut pa_mainloop, client_name: *const c_char) -> *mut pa_context;
     // TODO: define a real type for the callback
-    fn pa_context_set_state_callback(context: *mut pa_context, cb: *const c_void, userdata: *mut c_void);
+    fn pa_context_set_state_callback(context: *mut pa_context, cb: extern fn(*mut pa_context, *mut c_void), userdata: *mut c_void);
     fn pa_context_connect(context: *mut pa_context, server: *const c_char, flags: c_int, api: *const pa_spawn_api) -> c_int;
     fn pa_context_get_state(context: *mut pa_context) -> pa_context_state;
     fn pa_mainloop_run(m: *mut pa_mainloop, result: *mut c_int) -> c_int;
@@ -67,7 +72,7 @@ fn rs_pa_context_connect(context: *mut pa_context, server: &str, flags: c_int, a
 
 
 
-pub fn context_state_callback(context: *mut pa_context, userdata: *mut c_void) {
+extern fn context_state_callback(context: *mut pa_context, userdata: *mut c_void) {
     println!("yay called back");
     let state = unsafe{ pa_context_get_state(context) };
     println!("state={}", state as c_int);
@@ -79,8 +84,8 @@ pub fn main() {
     let mainloop: *mut pa_mainloop = unsafe{ pa_mainloop_new() };
     let mainloop_api: *mut pa_mainloop_api = unsafe{ pa_mainloop_get_api(mainloop) };
     let context = rs_pa_context_new(mainloop, "rs_test_async");
-    unsafe { pa_context_set_state_callback(context, transmute(context_state_callback), ptr::null_mut()) };
-    rs_pa_context_connect(context, "myname", 0, ptr::null());
+    unsafe { pa_context_set_state_callback(context, context_state_callback, ptr::null_mut()) };
+    rs_pa_context_connect(context, "pulse", 0, ptr::null());
     let mut res: c_int = 0;
     if unsafe{ pa_mainloop_run(mainloop, &mut res) } < 0 {
         println!("baddd");
