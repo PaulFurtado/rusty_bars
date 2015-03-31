@@ -22,6 +22,17 @@ pub struct pa_mainloop;
 pub struct pa_mainloop_api;
 pub struct pa_context;
 pub struct pa_spawn_api;
+pub enum pa_context_state {
+    UNCONNECTED,  // 	The context hasn't been connected yet.
+    CONNECTING,   //	A connection is being established.
+    AUTHORIZING,  //	The client is authorizing itself to the daemon.
+    SETTING_NAME, //	The client is passing its application name to the daemon.
+    READY,        //	The connection is established, the context is ready to execute operations.
+    FAILED,       // The connection failed or was disconnected.
+    TERMINATED,   // The connection was terminated cleanly.
+}
+
+
 
 
 #[link(name="pulse")]
@@ -32,7 +43,11 @@ extern {
     // TODO: define a real type for the callback
     fn pa_context_set_state_callback(context: *mut pa_context, cb: *const c_void, userdata: *mut c_void);
     fn pa_context_connect(context: *mut pa_context, server: *const c_char, flags: c_int, api: *const pa_spawn_api) -> c_int;
+    fn pa_context_get_state(context: *mut pa_context) -> pa_context_state;
+    fn pa_mainloop_run(m: *mut pa_mainloop, result: *mut c_int) -> c_int;
 }
+
+
 
 
 fn rs_pa_context_new(mainloop: *mut pa_mainloop, client_name: &str) -> *mut pa_context {
@@ -54,6 +69,9 @@ fn rs_pa_context_connect(context: *mut pa_context, server: &str, flags: c_int, a
 
 pub fn context_state_callback(context: *mut pa_context, userdata: *mut c_void) {
     println!("yay called back");
+    let state = unsafe{ pa_context_get_state(context) };
+    println!("state={}", state as c_int);
+    
 }
 
 
@@ -63,7 +81,10 @@ pub fn main() {
     let context = rs_pa_context_new(mainloop, "rs_test_async");
     unsafe { pa_context_set_state_callback(context, transmute(context_state_callback), ptr::null_mut()) };
     rs_pa_context_connect(context, "myname", 0, ptr::null());
-    
+    let mut res: c_int = 0;
+    if unsafe{ pa_mainloop_run(mainloop, &mut res) } < 0 {
+        println!("baddd");
+    }
     
     println!("woohooo asynccc");
 }
