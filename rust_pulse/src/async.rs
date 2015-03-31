@@ -3,8 +3,10 @@ extern crate libc;
 use self::libc::{c_int, c_char, size_t, c_void};
 use std::ptr;
 use std::os;
-use std::mem::transmute;
+use std::mem::{transmute, forget};
 use std::ffi::CString;
+use std::io::timer;
+use std::time::duration::Duration;
 
 
 /*
@@ -37,6 +39,7 @@ pub enum pa_context_state {
     TERMINATED,   // The connection was terminated cleanly.
 }
 
+pub type pa_context_notify_cb_t = extern fn(*mut pa_context, *mut c_void);
 
 
 
@@ -46,7 +49,7 @@ extern {
     fn pa_mainloop_get_api(m: *mut pa_mainloop) -> *mut pa_mainloop_api;
     fn pa_context_new(mainloop: *mut pa_mainloop, client_name: *const c_char) -> *mut pa_context;
     // TODO: define a real type for the callback
-    fn pa_context_set_state_callback(context: *mut pa_context, cb: extern fn(*mut pa_context, *mut c_void), userdata: *mut c_void);
+    fn pa_context_set_state_callback(context: *mut pa_context, cb: pa_context_notify_cb_t, userdata: *mut c_void);
     fn pa_context_connect(context: *mut pa_context, server: *const c_char, flags: c_int, api: *const pa_spawn_api) -> c_int;
     fn pa_context_get_state(context: *mut pa_context) -> pa_context_state;
     fn pa_mainloop_run(m: *mut pa_mainloop, result: *mut c_int) -> c_int;
@@ -56,14 +59,21 @@ extern {
 
 
 fn rs_pa_context_new(mainloop: *mut pa_mainloop, client_name: &str) -> *mut pa_context {
-    let path = CString::from_slice(client_name.as_bytes());
-
-    unsafe { pa_context_new(mainloop, path.as_ptr()) }
+    let name = CString::from_slice(client_name.as_bytes());
+    let res = unsafe { pa_context_new(mainloop, name.as_ptr()) };
+    unsafe { forget(name) };
+    res
 }
 
 fn rs_pa_context_connect(context: *mut pa_context, server: &str, flags: c_int, api: *const pa_spawn_api) -> c_int {
      let server = CString::from_slice(server.as_bytes());
-     let result = unsafe{ pa_context_connect(context, server.as_ptr(), flags, api) };
+     let result = unsafe{ pa_context_connect(context, ptr::null(), flags, api) };
+     unsafe {
+        forget(server);
+        forget(flags);
+        forget(api);
+     
+     };
      if result < 0 {
         panic!("ahhhhh");
      }
@@ -76,6 +86,12 @@ extern fn context_state_callback(context: *mut pa_context, userdata: *mut c_void
     println!("yay called back");
     let state = unsafe{ pa_context_get_state(context) };
     println!("state={}", state as c_int);
+    let interval = Duration::milliseconds(1000);
+    loop {
+        timer::sleep(interval);
+        println!("can you hear me now?");
+        break;
+    }
     
 }
 
@@ -86,6 +102,8 @@ pub fn main() {
     let context = rs_pa_context_new(mainloop, "rs_test_async");
     unsafe { pa_context_set_state_callback(context, context_state_callback, ptr::null_mut()) };
     rs_pa_context_connect(context, "pulse", 0, ptr::null());
+    println!("doesn't get here");
+    
     let mut res: c_int = 0;
     if unsafe{ pa_mainloop_run(mainloop, &mut res) } < 0 {
         println!("baddd");
