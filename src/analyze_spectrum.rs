@@ -342,33 +342,6 @@ impl<'a> AudioFFT<'a> {
         self.n * BYTES_PER_SAMPLE * self.channels
     }
 
-    /// Turns a slice of u8 into a Vec<f64> of half the length
-    /// (Reads the i16 values out of the buffer, then casts them to f64)
-    fn get_floats(&self, buffer: &[u8]) -> Vec<f64> {
-        let short_vec: Vec<i16> = unsafe{ Vec::from_raw_buf(buffer.as_ptr() as *const i16, buffer.len()/2) };
-        let mut float_vec: Vec<f64> = Vec::with_capacity(short_vec.len());
-        for val in short_vec.iter() {
-            float_vec.push(*val as f64);
-        }
-        float_vec
-    }
-
-    /// Splits audio data channels out into separate vectors
-    /// For stereo, these means producing a vector of two vectors, where the
-    /// first vector is the audio data for the left channel and the second
-    /// vector is the audio data for the right channel
-    fn split_channels(&self, all_floats: &Vec<f64>) -> Vec<Vec<f64>> {
-        let mut out: Vec<Vec<f64>> = Vec::new();
-        for _ in range(0, self.channels) {
-            out.push(Vec::with_capacity(all_floats.len()/self.channels));
-        }
-        for (i, &val) in all_floats.iter().enumerate() {
-            out[i % self.channels].push(val);
-        }
-        out
-    }
-
-
     /// Reads the output from the FFT and converts it into averages of parts of
     /// the power spectrum. (Ex: an equalizer visualizer).
     /// This function may need some work.
