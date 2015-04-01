@@ -176,43 +176,46 @@ impl Drop for PulseSimple {
 
 
 
-
-
 fn run_analyzer(dev: &str) {
+    // Initialize the FFT first so that we don't hold up pulseaudio while
+    // waiting for the FFT planner
+    let mut fft = analyze_spectrum::AudioFFT::new(2048, 2);
+
+    // The sample spec to record from pulseaudio at
     let sample_spec = PulseSampleSpec{
         format: PA_SAMPLE_S16LE,
         rate: 44100,
         channels: 2
     };
 
-
-    let mut pulse = PulseSimple::new(dev, StreamDirection::StreamRecord, &sample_spec).unwrap();
-    let mut fft = analyze_spectrum::AudioFFT::new(2048, 2);
-
+    // Initialize the buffer we use for reading from pulse audio
     let mut buffer_vec: Vec<u8> = Vec::with_capacity(fft.get_buf_size());
     for _ in range(0, fft.get_buf_size()) {
         buffer_vec.push(0);
     }
     let mut buffer = buffer_vec.as_mut_slice();
 
+    // Initialize pulseaudio
+    let mut pulse = PulseSimple::new(dev, StreamDirection::StreamRecord, &sample_spec).unwrap();
+
+    // Initialize the visualizer last so we don't put the screen in ncurses-mode
+    // while we're doint set up (so we can log and don't mess up the screen if
+    // we crash early).
     let mut vis = visualizer::Visualizer::new();
 
     loop {
         pulse.read(buffer).unwrap();
         let output = fft.execute(buffer);
-
+        vis.render_frame(&output);
+        // Commented out code below is for pumping the data to a client
         //let temp: Vec<String> = output.iter().map(|x| format!("{}", x)).collect();
         //println!("{}", temp.connect(", "));
-        vis.render_frame(&output);
     }
 }
 
 
 
-
-
 fn main() {
-
     //async::main();
 
     let args = os::args();
@@ -224,8 +227,6 @@ fn main() {
     }
 
     run_analyzer(args[1].as_slice());
-
-
 }
 
 // USEFUL DOCS:
