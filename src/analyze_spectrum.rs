@@ -64,7 +64,7 @@ pub enum FftwPlan {}
 
 #[repr(C)]
 #[derive(Copy)]
-struct FftwComplex {
+pub struct FftwComplex {
     re: f64,
     im: f64
 }
@@ -174,7 +174,6 @@ impl HanningWindowCalculator {
     }
 }
 
-
 pub struct ChannelInputManager {
     window_calculator: HanningWindowCalculator,
     channel_inputs: Vec<Vec<f64>>,
@@ -240,7 +239,52 @@ impl ChannelInputManager {
 }
 
 
+/// Takes output from FFTW for each channel and combines them, using only one
+/// vector instead of a vector for each channel.
+pub struct ChannelOutputManager {
+    channel_count: usize,
+    fft_size: usize,
+    combined: Vec<f64>
+}
 
+
+impl ChannelOutputManager {
+    /// Initialize a ChannelOutputManager
+    pub fn new(channel_count: usize, fft_size: usize) -> ChannelOutputManager {
+        let mut combined: Vec<f64> = Vec::with_capacity(fft_size/2);
+        for _ in (0..fft_size/2) {
+            combined.push(0.0);
+        }
+
+        ChannelOutputManager {
+            channel_count: channel_count,
+            fft_size: fft_size,
+            combined: combined
+        }
+    }
+
+    /// Add values from an execution of FFTW. Combines multiple channels of
+    /// FFT by picking whichever channel is highest for each frequency bin.
+    /// Also handles conversion from FFT data to decibels
+    /// Arguments:
+    ///     values - a vector of values to load in
+    ///     overwrite - if true, overwrites the data in this ChannelOutputManager
+    ///                 with fresh data.
+    pub fn load_values(&mut self, values: &Vec<FftwComplex>, overwrite: bool) {
+        for i in (0..self.fft_size/2) {
+            let val: f64 = 20.0 * values[i].abs().log10();
+            if overwrite || val > self.combined[i] {
+                self.combined[i] = val;
+            }
+        }
+    }
+
+    /// Gets the combined output
+    pub fn get_combined(&self) -> Vec<f64> {
+        // TODO: just return an iterator instead of cloning
+        self.combined.clone()
+    }
+}
 
 
 
@@ -248,6 +292,7 @@ impl ChannelInputManager {
 pub struct AudioFFT<'a> {
     channels: usize,
     input_manager: ChannelInputManager,
+    output_manager: ChannelOutputManager,
     output: Vec<FftwComplex>,
     plan: *const FftwPlan,
     n: usize,
@@ -260,17 +305,12 @@ impl<'a> AudioFFT<'a> {
             panic!("n should be a power of two!");
         }
 
-        // input is the data to feed to the FFT
-        let mut input: Vec<f64> = Vec::with_capacity(n);
         // output is where the FFT puts its data.
         // FFTs are symmetrical and the real FFT optimizes by returning a
         // half-length array rather than doing extra computation
         let mut output: Vec<FftwComplex> = Vec::with_capacity(n/2);
 
         // initialize the arrays.
-        for _ in range(0, n) {
-            input.push(0f64);
-        }
         for _ in range(0, n/2) {
              output.push(FftwComplex{im:0f64,re:0f64});
         }
@@ -291,6 +331,7 @@ impl<'a> AudioFFT<'a> {
             output: output,
             plan: plan,
             input_manager: input_manager,
+            output_manager: ChannelOutputManager::new(channels, n),
             n: n
         }
     }
@@ -328,8 +369,6 @@ impl<'a> AudioFFT<'a> {
     }
 
 
-
-
     /// Reads the output from the FFT and converts it into averages of parts of
     /// the power spectrum. (Ex: an equalizer visualizer).
     /// This function may need some work.
@@ -350,9 +389,10 @@ impl<'a> AudioFFT<'a> {
                 self.input_manager.load_into_zero(channel);
             }
             unsafe { ext::fftw_execute(self.plan) };
+            self.output_manager.load_values(&self.output, channel == 0);
         }
 
-        self.get_output()
+        self.output_manager.get_combined()
     }
 
 }
