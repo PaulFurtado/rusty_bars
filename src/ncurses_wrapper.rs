@@ -82,17 +82,17 @@ impl Window {
     }
 
     /// Gets the maximum y on the screen
-    pub fn get_max_y(&mut self) -> Result<c_int, c_int> {
+    pub fn get_max_y(&self) -> Result<c_int, c_int> {
         handle_err(unsafe{ ext::getmaxy(self.w) })
     }
 
     /// Gets the maximum x on the screen
-    pub fn get_max_x(&mut self) -> Result<c_int, c_int> {
+    pub fn get_max_x(& self) -> Result<c_int, c_int> {
         handle_err(unsafe{ ext::getmaxx(self.w) })
     }
 
     // Gets a tuple containing the maximum y and x on the screen
-    pub fn get_max_yx(&mut self) -> Result<(c_int, c_int), c_int> {
+    pub fn get_max_yx(&self) -> Result<(c_int, c_int), c_int> {
         Ok((try!(self.get_max_y()), try!(self.get_max_x())))
     }
 
