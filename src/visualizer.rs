@@ -43,7 +43,7 @@ impl Visualizer {
         for y in (0..max_y) {
             for (x, &val) in scaled.iter().enumerate() {
                 if (val as c_int) > (max_y - (y as c_int)) {
-                    self.win.addstr(y as c_int, x as c_int, "$");
+                    self.win.addstr(y as c_int, x as c_int, "|");
                 } else {
                     self.win.addstr(y as c_int, x as c_int, " ");
                 }
