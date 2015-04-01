@@ -6,6 +6,9 @@ import curses
 
 
 def main(window):
+    curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_BLUE)
+    curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_RED)
+
     height, width = window.getmaxyx()
 
     window.addstr(0, 0, 'height: %s' % height)
@@ -27,17 +30,29 @@ def main(window):
                 raise Exception('that didnt work')
 
         highest = max(fft_avgs)
+        lowest = min(fft_avgs)
+
+        #highest = 30.0
         if highest == 0:
             highest = 1
-        heights = [int(x/highest*height) for x in fft_avgs]
+        divider = highest - lowest
+        #divider = highest
+        if divider == 0:
+            divider == 2
+
+        heights = [int((x-lowest)/divider*height) for x in fft_avgs]
+
         for row in range(height):
             eq_line = ''
             for i, f in enumerate(heights):
                 if f > (height - row):
-                    eq_line = '$'
+                    eq_line = ' '
+                    color = curses.A_STANDOUT
                 else:
                     eq_line = ' '
-                window.addstr(row, i, eq_line)
+                    color = 1
+                window.addstr(row, i, eq_line, color)
+        #window.addstr(1,0, 'a: %s' % (fft_avgs,))
         window.refresh()
 
 
