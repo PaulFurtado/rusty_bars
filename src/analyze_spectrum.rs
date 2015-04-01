@@ -77,6 +77,35 @@ fn test_pwer_two() {
 }
 
 
+/// Scales down a vector by averaging the elements between the resulting points
+pub fn scale_fft_output(input: &Vec<f64>, new_len: usize) -> Vec<f64> {
+    let band_size: usize = input.len() / new_len;
+    assert!(band_size > 0);
+    let mut output: Vec<f64> = Vec::with_capacity(new_len);
+
+    let mut temp_count: usize = 0;
+    let mut sum: f64 = 0.0;
+
+    for &x in input.iter() {
+        if temp_count >= band_size {
+            let avg: f64 = sum/temp_count as f64;
+            output.push(avg);
+            temp_count = 0;
+            sum = 0.0;
+        } else {
+            sum += x;
+            temp_count+=1;
+        }
+    }
+
+    if temp_count >= band_size {
+        output.push(sum/temp_count as f64);
+    }
+
+    output
+}
+
+
 
 
 pub struct AudioFFT<'a> {
@@ -84,14 +113,12 @@ pub struct AudioFFT<'a> {
     input: Vec<f64>,
     output: Vec<FftwComplex>,
     plan: *const FftwPlan,
-    bands: usize,
     n: usize,
-    sample_rate: usize
 }
 
 
 impl<'a> AudioFFT<'a> {
-    pub fn new(n: usize, channels: usize, sample_rate: usize, bands: usize) -> AudioFFT<'a> {
+    pub fn new(n: usize, channels: usize) -> AudioFFT<'a> {
         if !is_power_of_two(n) {
             panic!("n should be a power of two!");
         }
@@ -117,10 +144,8 @@ impl<'a> AudioFFT<'a> {
             channels: channels,
             input: input,
             output: output,
-            bands: bands,
             plan: plan,
-            n: n,
-            sample_rate: sample_rate
+            n: n
         }
     }
 
@@ -129,7 +154,6 @@ impl<'a> AudioFFT<'a> {
         const BYTES_PER_SAMPLE: usize = 2; // 16 bit
         self.n * BYTES_PER_SAMPLE * self.channels
     }
-
 
     /// Turns a slice of u8 into a Vec<f64> of half the length
     /// (Reads the i16 values out of the buffer, then casts them to f64)
@@ -177,43 +201,12 @@ impl<'a> AudioFFT<'a> {
         }
     }
 
-
     /// Reads the output from the FFT and converts it into averages of parts of
     /// the power spectrum. (Ex: an equalizer visualizer).
     /// This function may need some work.
     fn get_output(&self) -> Vec<f64> {
-        // Conver the FFT data into decibals (power)
-        let power:Vec<f64> = self.output.iter().map(|x| 20.0 * x.abs().log10()).collect();
-        let band_size = power.len() / self.bands;
-        let mut out: Vec<f64> = Vec::new();
-
-
-        for _ in range(0, self.bands) {
-            out.push(0f64);
-        }
-
-        // Sum the bands
-        for (i, &val) in power.iter().enumerate() {
-            // i/band_size is kinda dirty. Maybe loop through bands and take
-            // slices instead?
-            let index = i/band_size;
-            if index < out.len() {
-                out[index] += val;
-            }
-        }
-
-        // divide by band size to get mean
-        for v in out.iter_mut() {
-            if *v == f64::NEG_INFINITY {
-                *v = 0.0;
-            } else {
-                *v = *v/(band_size as f64);
-            }
-        }
-
-
-        out
-        //power
+        // Convert the FFT data into decibals (power)
+        self.output.iter().map(|x| 20.0 * x.abs().log10()).collect()
     }
 
     /// Turn a buffer into equalizer data.
@@ -229,6 +222,5 @@ impl<'a> AudioFFT<'a> {
         unsafe { ext::fftw_execute(self.plan) };
         self.get_output()
     }
-
 
 }
