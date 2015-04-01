@@ -44,17 +44,25 @@ impl Visualizer {
             .map(|&x| ((x / max_val) * (max_y as f64) + 0.5) as usize)
             .collect();
 
+
         for y in (0..max_y) {
+            let mut row = String::with_capacity(max_y as usize);
+
             for (x, &val) in scaled.iter().enumerate() {
                 if (val as c_int) > (max_y - (y as c_int)) {
-                    self.win.addstr(y as c_int, x as c_int, "|");
+                    row.push('|');
                 } else {
-                    self.win.addstr(y as c_int, x as c_int, " ");
+                    row.push(' ');
                 }
             }
-        }
-        self.win.refresh();
 
+            self.win.addstr(y as c_int, 0, row.as_slice());
+        }
+
+        let debugstr = format!("width: {}, height: {}, bars: {}", max_x, max_y, scaled.len());
+        self.win.addstr(0, max_x - debugstr.len() as c_int - 1, debugstr.as_slice());
+
+        self.win.refresh();
 
         Ok(())
     }
