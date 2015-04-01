@@ -32,6 +32,10 @@ impl Visualizer {
         Visualizer{win: Window::initscr().unwrap()}
     }
 
+    pub fn get_width(&self) -> usize {
+        self.win.get_max_x().unwrap() as usize
+    }
+
     pub fn render_frame(&mut self, data: &Vec<f64>) -> Result<(), c_int> {
         let (max_y, max_x) = try!(self.win.get_max_yx());
         let data = scale_fft_output(data, max_x as usize);
