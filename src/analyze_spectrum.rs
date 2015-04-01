@@ -228,6 +228,7 @@ impl ChannelInputManager {
 
     /// Load the channel number into channel 0 so the FFT can be executed on it
     pub fn load_into_zero(&mut self, channel: usize) {
+        return;
         unsafe {
             ptr::copy_memory(
                 self.channel_inputs[0].as_mut_ptr(),
@@ -307,11 +308,12 @@ impl<'a> AudioFFT<'a> {
 
         // output is where the FFT puts its data.
         // FFTs are symmetrical and the real FFT optimizes by returning a
-        // half-length array rather than doing extra computation
-        let mut output: Vec<FftwComplex> = Vec::with_capacity(n/2);
+        // half-length array rather than doing extra computation.
+        // However, we cannot
+        let mut output: Vec<FftwComplex> = Vec::with_capacity(n);
 
         // initialize the arrays.
-        for _ in range(0, n/2) {
+        for _ in range(0, n) {
              output.push(FftwComplex{im:0f64,re:0f64});
         }
 
