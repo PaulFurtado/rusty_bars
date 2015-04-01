@@ -13,6 +13,8 @@ use std::str::from_utf8;
 use libc::funcs::c95::string::strlen;
 pub mod analyze_spectrum;
 pub mod async;
+pub mod visualizer;
+mod ncurses_wrapper;
 
 
 #[link(name="pulse-simple")]
@@ -185,7 +187,7 @@ fn run_analyzer(dev: &str) {
 
 
     let mut pulse = PulseSimple::new(dev, StreamDirection::StreamRecord, &sample_spec).unwrap();
-    let mut fft = analyze_spectrum::AudioFFT::new(2048, 2, 44100, 500);
+    let mut fft = analyze_spectrum::AudioFFT::new(2048, 2);
 
     let mut buffer_vec: Vec<u8> = Vec::with_capacity(fft.get_buf_size());
     for _ in range(0, fft.get_buf_size()) {
@@ -193,12 +195,15 @@ fn run_analyzer(dev: &str) {
     }
     let mut buffer = buffer_vec.as_mut_slice();
 
+    let mut vis = visualizer::Visualizer::new();
+
     loop {
         pulse.read(buffer).unwrap();
         let output = fft.execute(buffer);
 
-        let temp: Vec<String> = output.iter().map(|x| format!("{}", x)).collect();
-        println!("{}", temp.connect(", "));
+        //let temp: Vec<String> = output.iter().map(|x| format!("{}", x)).collect();
+        //println!("{}", temp.connect(", "));
+        vis.render_frame(&output);
     }
 }
 
@@ -208,7 +213,7 @@ fn run_analyzer(dev: &str) {
 
 fn main() {
 
-    async::main();
+    //async::main();
 
     let args = os::args();
     if args.len() != 2 {
