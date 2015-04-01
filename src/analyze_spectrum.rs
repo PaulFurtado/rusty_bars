@@ -5,6 +5,7 @@ use self::libc::{c_int};
 use std::num::Float;
 use std::f64::consts::PI;
 use std::f64;
+use std::ptr;
 
 /*
 This module is responsible for a number of tasks:
@@ -96,6 +97,19 @@ fn test_pwer_two() {
 }
 
 
+
+pub fn compute_input_size(desired_output: usize) -> usize {
+    for size in (desired_output..8192) {
+        if is_power_of_two(size) {
+            return desired_output * 2;
+        }
+    }
+    return 8192 * 2;
+}
+
+
+
+
 /// Scales down a vector by averaging the elements between the resulting points
 pub fn scale_fft_output(input: &Vec<f64>, new_len: usize) -> Vec<f64> {
     if new_len >= input.len() {
@@ -130,10 +144,110 @@ pub fn scale_fft_output(input: &Vec<f64>, new_len: usize) -> Vec<f64> {
 
 
 
+/// Precomputes the multipliers for the hanning window function so computing
+/// the value only takes a single multiplication.
+pub struct HanningWindowCalculator {
+    multipliers: Vec<f64>
+}
+
+
+impl HanningWindowCalculator {
+    /// The constructor computes the cache of hanning window multiplier values
+    fn new(fft_size: usize) -> HanningWindowCalculator {
+        let mut multipliers: Vec<f64> = Vec::with_capacity(fft_size);
+        let divider: f64 = (fft_size - 1) as f64;
+
+        for i in (0..fft_size) {
+            let cos_inner: f64 = 2.0 * PI * (i as f64) / divider;
+            let cos_part: f64 = cos_inner.cos();
+            let multiplier: f64 = 0.5 * (1.0 - cos_part);
+            multipliers.push(multiplier);
+        }
+
+        HanningWindowCalculator{multipliers: multipliers}
+    }
+
+    /// Multiplies the given value against the hanning window multiplier value
+    /// for this index
+    fn get_value(&self, index: usize, val: f64) -> f64 {
+        self.multipliers[index] * val
+    }
+}
+
+
+pub struct ChannelInputManager {
+    window_calculator: HanningWindowCalculator,
+    channel_inputs: Vec<Vec<f64>>,
+    fft_size: usize,
+    channel_count: usize
+}
+
+
+impl ChannelInputManager {
+    pub fn new(channel_count: usize, fft_size: usize) -> ChannelInputManager {
+        let mut inputs: Vec<Vec<f64>> = Vec::with_capacity(channel_count);
+
+        // Create an initialize a vec of the right length
+        let mut base_vec: Vec<f64> = Vec::with_capacity(fft_size);
+        for _ in (0..fft_size) {
+            base_vec.push(0f64);
+        }
+
+        // Clone the first channel for all additional channels (rather than
+        // initializing a fresh vector).
+        for _ in (0..channel_count) {
+            inputs.push(base_vec.clone());
+        }
+
+        ChannelInputManager{
+            window_calculator: HanningWindowCalculator::new(fft_size),
+            channel_inputs: inputs,
+            fft_size: fft_size,
+            channel_count: channel_count
+        }
+    }
+
+    pub fn get_chan_zero_ptr(&mut self) -> *mut f64 {
+        self.channel_inputs[0].as_mut_ptr()
+    }
+
+    /// Load raw data from an S16LE buffer of audio data into each channel,
+    /// performing the hanning window function as it loads them
+    pub fn load_in_data(&mut self, buffer: &[u8]) {
+        // Cast the &[u8] pointer to an i16 pointer so we don't have to do a
+        // conversion of each element to i16
+        let buf_ptr: *const i16 = buffer.as_ptr() as *const i16;
+        for i in (0..buffer.len()/2) {
+            let channel = i % self.channel_count;
+            let channel_index = i/self.channel_count;
+
+            let value: i16 = unsafe { *buf_ptr.offset(i as isize) };
+            let value_f64: f64 = self.window_calculator.get_value(channel_index, value as f64);
+            self.channel_inputs[channel][channel_index] = value_f64;
+        }
+    }
+
+    /// Load the channel number into channel 0 so the FFT can be executed on it
+    pub fn load_into_zero(&mut self, channel: usize) {
+        unsafe {
+            ptr::copy_memory(
+                self.channel_inputs[0].as_mut_ptr(),
+                self.channel_inputs[channel].as_ptr(),
+                self.fft_size
+            )
+        }
+    }
+}
+
+
+
+
+
+
 
 pub struct AudioFFT<'a> {
     channels: usize,
-    input: Vec<f64>,
+    input_manager: ChannelInputManager,
     output: Vec<FftwComplex>,
     plan: *const FftwPlan,
     n: usize,
@@ -161,13 +275,22 @@ impl<'a> AudioFFT<'a> {
              output.push(FftwComplex{im:0f64,re:0f64});
         }
 
-        let plan = unsafe { ext::fftw_plan_dft_r2c_1d(n as i32, input.as_mut_ptr(), output.as_mut_ptr(), FFTW_MEASURE)};
+        let mut input_manager = ChannelInputManager::new(channels, n);
+
+        let plan = unsafe {
+            ext::fftw_plan_dft_r2c_1d(
+                n as i32,
+                input_manager.get_chan_zero_ptr(),
+                output.as_mut_ptr(),
+                FFTW_MEASURE
+            )
+        };
 
         AudioFFT {
             channels: channels,
-            input: input,
             output: output,
             plan: plan,
+            input_manager: input_manager,
             n: n
         }
     }
@@ -204,25 +327,8 @@ impl<'a> AudioFFT<'a> {
         out
     }
 
-    /// Loads an audo channel's vector into the input for the FFT
-    fn load_channel(&mut self, channel_data: &Vec<f64>) {
-        for (i, &val) in channel_data.iter().enumerate() {
-            self.input[i] = val;
-        }
-    }
 
-    /// Modifies a vector in-place with the hanning window function
-    /// This prevents spectral leakage
-    fn do_hanning_window(&self, channel_data: &mut Vec<f64>) {
-        let divider: f64 = (channel_data.len() - 1) as f64;
 
-        for (i, val) in channel_data.iter_mut().enumerate() {
-            let cos_inner: f64 = 2.0 * PI * (i as f64) / divider;
-            let cos_part: f64 = cos_inner.cos();
-            let multiplier: f64 = 0.5 * (1.0 - cos_part);
-            *val = *val * multiplier;
-        }
-    }
 
     /// Reads the output from the FFT and converts it into averages of parts of
     /// the power spectrum. (Ex: an equalizer visualizer).
@@ -237,12 +343,15 @@ impl<'a> AudioFFT<'a> {
         if buffer.len() != self.get_buf_size() {
             panic!("incorrect buffer length");
         }
-        let all_floats = self.get_floats(buffer);
-        let mut channel_data = self.split_channels(&all_floats);
-        self.do_hanning_window(&mut channel_data[0]);
-        self.load_channel(&channel_data[0]);
+        self.input_manager.load_in_data(buffer);
 
-        unsafe { ext::fftw_execute(self.plan) };
+        for channel in (0..self.channels) {
+            if channel > 0 {
+                self.input_manager.load_into_zero(channel);
+            }
+            unsafe { ext::fftw_execute(self.plan) };
+        }
+
         self.get_output()
     }
 
