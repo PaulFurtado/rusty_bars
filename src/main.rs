@@ -12,7 +12,7 @@ use std::ffi::CString;
 use std::str::from_utf8;
 use libc::funcs::c95::string::strlen;
 pub mod analyze_spectrum;
-
+pub mod async;
 
 
 #[link(name="pulse-simple")]
@@ -208,7 +208,7 @@ fn run_analyzer(dev: &str) {
 
 fn main() {
 
-
+    async::main();
 
     let args = os::args();
     if args.len() != 2 {
