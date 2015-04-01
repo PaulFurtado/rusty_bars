@@ -35,7 +35,26 @@ mod ext {
 }
 
 
+/// {FFTW_ESTIMATE} or 64. Specifies that, instead of actual measurements of
+/// different algorithms, a simple heuristic is used to pick a (probably
+/// sub-optimal) plan quickly. With this flag, the input/output arrays are not
+/// overwritten during planning. It is the default value
 const FFTW_ESTIMATE: c_int = (1 << 6);
+/// FFTW_MEASURE or 0. tells FFTW to find an optimized plan by actually
+/// computing several FFTs and measuring their execution time. Depending on
+/// your machine, this can take some time (often a few seconds).
+const FFTW_MEASURE: c_int = 0;
+/// FFTW_PATIENT or 32. It is like "FFTW_MEASURE", but considers a wider range
+/// of algorithms and often produces a “more optimal” plan (especially for large
+/// transforms), but at the expense of several times longer planning time
+/// (especially for large transforms).
+const FFTW_PATIENT: c_int = 32;
+/// FFTW_EXHAUSTIVE or 8. It is like "FFTW_PATIENT", but considers an even wider
+/// range of algorithms, including many that we think are unlikely to be fast,
+/// to produce the most optimal plan but with a substantially increased planning
+/// time.
+const FFTW_EXHAUSTIVE: c_int = 8;
+
 
 
 #[derive(Copy)]
@@ -79,6 +98,10 @@ fn test_pwer_two() {
 
 /// Scales down a vector by averaging the elements between the resulting points
 pub fn scale_fft_output(input: &Vec<f64>, new_len: usize) -> Vec<f64> {
+    if new_len >= input.len() {
+        return input.clone();
+    }
+
     let band_size: usize = input.len() / new_len;
     assert!(band_size > 0);
     let mut output: Vec<f64> = Vec::with_capacity(new_len);
@@ -138,7 +161,7 @@ impl<'a> AudioFFT<'a> {
              output.push(FftwComplex{im:0f64,re:0f64});
         }
 
-        let plan = unsafe { ext::fftw_plan_dft_r2c_1d(n as i32, input.as_mut_ptr(), output.as_mut_ptr(), FFTW_ESTIMATE)};
+        let plan = unsafe { ext::fftw_plan_dft_r2c_1d(n as i32, input.as_mut_ptr(), output.as_mut_ptr(), FFTW_MEASURE)};
 
         AudioFFT {
             channels: channels,
