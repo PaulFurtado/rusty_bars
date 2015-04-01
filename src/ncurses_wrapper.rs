@@ -28,7 +28,7 @@ mod ext {
 
 
 /// Safe wrapper for the ncurses endwin function
-fn endwin() -> Result<(), c_int> {
+pub fn endwin() -> Result<(), c_int> {
     let result = unsafe{ ext::endwin() };
     if result == 0 {
         return Ok(())
@@ -51,7 +51,7 @@ fn handle_err(result: c_int) -> Result<c_int, c_int> {
 
 /// Wraps an ncruses WINDOW struct with the basic functions for manipulating
 /// the window.
-struct Window {
+pub struct Window {
     w: *mut ext::WINDOW
 }
 
