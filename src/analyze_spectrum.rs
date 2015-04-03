@@ -4,7 +4,6 @@ extern crate libc;
 use self::libc::{c_int};
 use std::num::Float;
 use std::f64::consts::PI;
-use std::f64;
 use std::ptr;
 
 /*
@@ -228,7 +227,6 @@ impl ChannelInputManager {
 
     /// Load the channel number into channel 0 so the FFT can be executed on it
     pub fn load_into_zero(&mut self, channel: usize) {
-        return;
         unsafe {
             ptr::copy_memory(
                 self.channel_inputs[0].as_mut_ptr(),
@@ -243,7 +241,6 @@ impl ChannelInputManager {
 /// Takes output from FFTW for each channel and combines them, using only one
 /// vector instead of a vector for each channel.
 pub struct ChannelOutputManager {
-    channel_count: usize,
     fft_size: usize,
     combined: Vec<f64>
 }
@@ -251,14 +248,13 @@ pub struct ChannelOutputManager {
 
 impl ChannelOutputManager {
     /// Initialize a ChannelOutputManager
-    pub fn new(channel_count: usize, fft_size: usize) -> ChannelOutputManager {
+    pub fn new(fft_size: usize) -> ChannelOutputManager {
         let mut combined: Vec<f64> = Vec::with_capacity(fft_size/2);
         for _ in (0..fft_size/2) {
             combined.push(0.0);
         }
 
         ChannelOutputManager {
-            channel_count: channel_count,
             fft_size: fft_size,
             combined: combined
         }
@@ -281,9 +277,9 @@ impl ChannelOutputManager {
     }
 
     /// Gets the combined output
-    pub fn get_combined(&self) -> Vec<f64> {
+    pub fn get_combined(&self) -> &Vec<f64> {
         // TODO: just return an iterator instead of cloning
-        self.combined.clone()
+        &self.combined
     }
 }
 
@@ -309,7 +305,9 @@ impl<'a> AudioFFT<'a> {
         // output is where the FFT puts its data.
         // FFTs are symmetrical and the real FFT optimizes by returning a
         // half-length array rather than doing extra computation.
-        // However, we cannot
+        // However, we cannot simply use n/2 as the capactiy of the output
+        // vector because FFTW writes the full N bytes when measuring the
+        // performance of different algorithms.
         let mut output: Vec<FftwComplex> = Vec::with_capacity(n);
 
         // initialize the arrays.
@@ -333,7 +331,7 @@ impl<'a> AudioFFT<'a> {
             output: output,
             plan: plan,
             input_manager: input_manager,
-            output_manager: ChannelOutputManager::new(channels, n),
+            output_manager: ChannelOutputManager::new(n),
             n: n
         }
     }
@@ -344,16 +342,8 @@ impl<'a> AudioFFT<'a> {
         self.n * BYTES_PER_SAMPLE * self.channels
     }
 
-    /// Reads the output from the FFT and converts it into averages of parts of
-    /// the power spectrum. (Ex: an equalizer visualizer).
-    /// This function may need some work.
-    fn get_output(&self) -> Vec<f64> {
-        // Convert the FFT data into decibals (power)
-        self.output.iter().map(|x| 20.0 * x.abs().log10()).collect()
-    }
-
     /// Turn a buffer into equalizer data.
-    pub fn execute(&mut self, buffer: &[u8]) -> Vec<f64> {
+    pub fn execute(&mut self, buffer: &[u8]) -> &Vec<f64> {
         if buffer.len() != self.get_buf_size() {
             panic!("incorrect buffer length");
         }
