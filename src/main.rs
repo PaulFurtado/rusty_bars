@@ -11,10 +11,13 @@ use std::mem::transmute;
 use std::ffi::CString;
 use std::str::from_utf8;
 use libc::funcs::c95::string::strlen;
+use std::cmp::max;
 pub mod analyze_spectrum;
-pub mod async;
 pub mod visualizer;
 mod ncurses_wrapper;
+mod pulse_types;
+mod pulse;
+
 
 
 #[link(name="pulse-simple")]
@@ -65,6 +68,7 @@ pub struct PaSimpleC;
 
 
 #[derive(Copy,Clone)]
+#[repr(C)]
 pub enum StreamDirection {
     NoDirection,
     StreamPlayback,
@@ -177,16 +181,21 @@ impl Drop for PulseSimple {
 
 
 fn run_analyzer(dev: &str) {
-    // Initialize the FFT first so that we don't hold up pulseaudio while
-    // waiting for the FFT planner
-    let mut fft = analyze_spectrum::AudioFFT::new(2048, 2);
-
     // The sample spec to record from pulseaudio at
     let sample_spec = PulseSampleSpec{
         format: PA_SAMPLE_S16LE,
         rate: 44100,
         channels: 2
     };
+
+    let mut vis = visualizer::Visualizer::new();
+    let width = vis.get_width();
+    // TODO: compute_input_size is totally broken.
+    let fft_size = analyze_spectrum::compute_input_size(max(width, 512));
+
+    // Initialize the FFT first so that we don't hold up pulseaudio while
+    // waiting for the FFT planner
+    let mut fft = analyze_spectrum::AudioFFT::new(fft_size, 2);
 
     // Initialize the buffer we use for reading from pulse audio
     let mut buffer_vec: Vec<u8> = Vec::with_capacity(fft.get_buf_size());
@@ -198,15 +207,15 @@ fn run_analyzer(dev: &str) {
     // Initialize pulseaudio
     let mut pulse = PulseSimple::new(dev, StreamDirection::StreamRecord, &sample_spec).unwrap();
 
-    // Initialize the visualizer last so we don't put the screen in ncurses-mode
-    // while we're doint set up (so we can log and don't mess up the screen if
-    // we crash early).
-    let mut vis = visualizer::Visualizer::new();
 
     loop {
         pulse.read(buffer).unwrap();
         let output = fft.execute(buffer);
-        vis.render_frame(&output);
+        //println!("sup");
+        match vis.render_frame(output) {
+            Err(x) => panic!("error: {}", x),
+            Ok(_) => {}
+        }
         // Commented out code below is for pumping the data to a client
         //let temp: Vec<String> = output.iter().map(|x| format!("{}", x)).collect();
         //println!("{}", temp.connect(", "));
