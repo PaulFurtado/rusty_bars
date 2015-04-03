@@ -35,6 +35,7 @@ mod ext {
 }
 
 
+// TODO: make this a real enum
 /// {FFTW_ESTIMATE} or 64. Specifies that, instead of actual measurements of
 /// different algorithms, a simple heuristic is used to pick a (probably
 /// sub-optimal) plan quickly. With this flag, the input/output arrays are not
