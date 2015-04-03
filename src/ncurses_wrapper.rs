@@ -3,31 +3,11 @@
 extern crate libc;
 
 use std::ffi::CString;
-use std::io::timer;
-use std::time::duration::Duration;
-use self::libc::{c_int};
+use self::libc::{c_int, c_char};
 
 
-mod ext {
-    extern crate libc;
-    use self::libc::{c_int, c_char};
-
-    #[repr(C)]
-    pub struct WINDOW;
-
-    #[link(name="ncurses")]
-    extern {
-        pub fn initscr() -> *mut WINDOW;
-        pub fn endwin() -> c_int;
-        pub fn wrefresh(win: *mut WINDOW) -> c_int;
-        pub fn mvwaddstr(win: *mut WINDOW, y: c_int, x: c_int, text: *const c_char) -> c_int;
-        pub fn getmaxy(win: *mut WINDOW) -> c_int;
-        pub fn getmaxx(win: *mut WINDOW) -> c_int;
-    }
-}
-
-
-/// Safe wrapper for the ncurses endwin function
+/// Safe wrapper for the ncurses endwin function. Call this when you are done
+/// with ncurses.
 pub fn endwin() -> Result<(), c_int> {
     let result = unsafe{ ext::endwin() };
     if result == 0 {
@@ -37,17 +17,6 @@ pub fn endwin() -> Result<(), c_int> {
         return Err(result)
     }
 }
-
-
-/// Turns an ncurses error code into a result so we can toss errors up the stack
-fn handle_err(result: c_int) -> Result<c_int, c_int> {
-    if result < 0 {
-        Err(result)
-    } else {
-        Ok(result)
-    }
-}
-
 
 /// Wraps an ncruses WINDOW struct with the basic functions for manipulating
 /// the window.
@@ -76,47 +45,69 @@ impl Window {
         })
     }
 
+    /// Add a raw array of c_char to the window
+    pub fn addbytes(&mut self, y: c_int, x: c_int, text: &Vec<c_char>) -> Result<c_int, c_int> {
+        handle_err(unsafe{
+            ext::mvwaddnstr(self.w, y, x, text.as_ptr(), text.len() as c_int)
+        })
+    }
+
     /// Refresh the output on the display
     pub fn refresh(&mut self) -> Result<c_int, c_int> {
         handle_err(unsafe{ ext::wrefresh(self.w) })
     }
 
-    /// Gets the maximum y on the screen
+    /// Get the maximum y on the screen
     pub fn get_max_y(&self) -> Result<c_int, c_int> {
         handle_err(unsafe{ ext::getmaxy(self.w) })
     }
 
-    /// Gets the maximum x on the screen
-    pub fn get_max_x(& self) -> Result<c_int, c_int> {
+    /// Get the maximum x on the screen
+    pub fn get_max_x(&self) -> Result<c_int, c_int> {
         handle_err(unsafe{ ext::getmaxx(self.w) })
     }
 
-    // Gets a tuple containing the maximum y and x on the screen
+    /// Get a tuple containing the maximum y and x on the screen
     pub fn get_max_yx(&self) -> Result<(c_int, c_int), c_int> {
         Ok((try!(self.get_max_y()), try!(self.get_max_x())))
     }
 
+    /// Set the visibility of the cursor
+    pub fn curs_set(&mut self, visibility: c_int) -> Result<c_int, c_int> {
+        handle_err(unsafe{ ext::curs_set(visibility) })
+    }
 }
 
 
-fn test() -> Result<(), c_int> {
-    let mut win = try!(Window::initscr());
-    try!(win.addstr(0, 0, "test1"));
-    try!(win.addstr(1, 0, "test2"));
-    try!(win.addstr(2, 0, "test3"));
-    try!(win.addstr(5, 10, "test5"));
-    try!(win.refresh());
-    let (y, x) =  try!(win.get_max_yx());
-    println!("y={}, x={}", y, x);
-    timer::sleep(Duration::milliseconds(10000));
-
-    try!(endwin());
-    Ok(())
+/// Turns an ncurses error code into a result so we can toss errors up the stack
+fn handle_err(result: c_int) -> Result<c_int, c_int> {
+    if result < 0 {
+        Err(result)
+    } else {
+        Ok(result)
+    }
 }
 
 
+mod ext {
+    #![allow(unstable)]
+    /// Module for external ncurses functions and types
 
-fn main() {
-    test().unwrap();
+    extern crate libc;
+    use self::libc::{c_int, c_char};
 
+    #[repr(C)]
+    pub struct WINDOW;
+
+    #[link(name="ncurses")]
+    extern {
+        pub fn initscr() -> *mut WINDOW;
+        pub fn endwin() -> c_int;
+        pub fn wrefresh(win: *mut WINDOW) -> c_int;
+        pub fn mvwaddstr(win: *mut WINDOW, y: c_int, x: c_int, text: *const c_char) -> c_int;
+        pub fn mvwaddnstr(win: *mut WINDOW, y: c_int, x: c_int, text: *const c_char, n: c_int) -> c_int;
+        pub fn getmaxy(win: *mut WINDOW) -> c_int;
+        pub fn getmaxx(win: *mut WINDOW) -> c_int;
+        pub fn curs_set(visibility: c_int) -> c_int;
+    }
 }
