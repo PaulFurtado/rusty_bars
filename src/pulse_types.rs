@@ -23,6 +23,13 @@ pub mod cb {
         eol: c_int, userdata:
         *mut c_void
     );
+
+    pub type pa_server_info_cb_t = extern "C" fn(
+        *mut pa_context,
+        i: *const pa_server_info,
+        *mut c_void
+    );
+
 }
 
 
@@ -161,8 +168,7 @@ pub mod enums {
         PA_SINK_HW_MUTE_CTRL = 0x0010is,
         PA_SINK_DECIBEL_VOLUME = 0x0020is,
         PA_SINK_FLAT_VOLUME = 0x0040is,
-        PA_SINK_DYNAMIC_LATENCY = 0x0080is,
-        PA_SINK_SET_FORMATS = 0x0100is
+        PA_SINK_DYNAMIC_LATENCY = 0x0080is
     }
 }
 
@@ -185,7 +191,7 @@ pub mod structs {
     #[derive(Copy)]
     pub struct pa_cvolume {
         channels: u8,
-        values: pa_volume_t
+        values: [pa_volume_t; 32]
     }
 
     #[repr(C)]
@@ -195,36 +201,51 @@ pub mod structs {
         values: pa_channel_position_t
     }
 
+    // FIXME: this struct doesn't match up with C
     #[repr(C)]
     #[derive(Copy)]
     pub struct pa_sink_info {
-        name: *const c_char,               //**< Name of the sink */
-        index: u32,                        //**< Index of the sink */
-        description: *const c_char,  //**< Description of this sink */
-        sample_spec: pa_sample_spec,        //**< Sample spec of this sink */
-        channel_map: pa_channel_map,        //**< Channel map */
-        owner_module: u32,             //**< Index of the owning module of this sink, or PA_INVALID_INDEX. */
-        volume: pa_cvolume,                 //**< Volume of the sink */
-        mute: c_int,                          //**< Mute switch of the sink */
-        monitor_source: u32,          //**< Index of the monitor source connected to this sink. */
-        monitor_source_name: *const c_char,   //**< The name of the monitor source. */
-        latency: pa_usec_t,                 //**< Length of queued audio in the output buffer. */
-        driver: *const c_char,                //**< Driver name */
-        flags: pa_sink_flags_t,             //**< Flags */
-        proplist: *mut pa_proplist,             //**< Property list \since 0.9.11 */
-        configured_latency: pa_usec_t,      //**< The latency this device has been configured to. \since 0.9.11 */
-        base_volume: pa_volume_t,           //**< Some kind of "base" volume that refers to unamplified/unattenuated volume in the context of the output device. \since 0.9.15 */
-        state: pa_sink_state_t,             //**< State \since 0.9.15 */
-        n_volume_steps: u32,           //**< Number of volume steps for sinks which do not support arbitrary volumes. \since 0.9.15 */
-        card: u32,                     //**< Card index, or PA_INVALID_INDEX. \since 0.9.15 */
-        n_ports: u32,                  //**< Number of entries in port array \since 0.9.16 */
-        ports: *mut c_void,
+        pub name: *const c_char,               //**< Name of the sink */
+        pub index: u32,                        //**< Index of the sink */
+        pub description: *const c_char,  //**< Description of this sink */
+        pub sample_spec: pa_sample_spec,        //**< Sample spec of this sink */
+        pub channel_map: pa_channel_map,        //**< Channel map */
+        pub owner_module: u32,             //**< Index of the owning module of this sink, or PA_INVALID_INDEX. */
+        pub volume: pa_cvolume,                 //**< Volume of the sink */
+        pub mute: c_int,                          //**< Mute switch of the sink */
+        pub monitor_source: u32,          //**< Index of the monitor source connected to this sink. */
+        pub monitor_source_name: *const c_char,   //**< The name of the monitor source. */
+        pub latency: pa_usec_t,                 //**< Length of queued audio in the output buffer. */
+        pub driver: *const c_char,                //**< Driver name */
+        pub flags: pa_sink_flags_t,             //**< Flags */
+        pub proplist: *mut pa_proplist,             //**< Property list \since 0.9.11 */
+        pub configured_latency: pa_usec_t,      //**< The latency this device has been configured to. \since 0.9.11 */
+        pub base_volume: pa_volume_t,           //**< Some kind of "base" volume that refers to unamplified/unattenuated volume in the context of the output device. \since 0.9.15 */
+        pub state: pa_sink_state_t,             //**< State \since 0.9.15 */
+        pub n_volume_steps: u32,           //**< Number of volume steps for sinks which do not support arbitrary volumes. \since 0.9.15 */
+        pub card: u32,                     //**< Card index, or PA_INVALID_INDEX. \since 0.9.15 */
+        pub n_ports: u32,                  //**< Number of entries in port array \since 0.9.16 */
+        pub ports: *mut c_void,
         //pa_sink_port_info** ports;         //**< Array of available ports, or NULL. Array is terminated by an entry set to NULL. The number of entries is stored in n_ports. \since 0.9.16 */
-        active_port: *mut c_void,
+        pub active_port: *mut c_void,
         //pa_sink_port_info* active_port;    //**< Pointer to active port in the array, or NULL. \since 0.9.16 */
-        n_formats: u8,
-        formats: *mut c_void          //**< Number of formats supported by the sink. \since 1.0 */
+        pub n_formats: u8,
+        pub formats: *mut c_void          //**< Number of formats supported by the sink. \since 1.0 */
         //pa_format_info **formats;          //**< Array of formats supported by the sink. \since 1.0 */
+    }
+
+    #[repr(C)]
+    #[derive(Copy)]
+    pub struct pa_server_info {
+        pub user_name: *const c_char,
+        pub host_name: *const c_char,
+        pub server_version: *const c_char,
+        pub server_name: *const c_char,
+        pub sample_spec: pa_sample_spec,
+        pub default_sink_name: *const c_char,
+        pub default_source_name: *const c_char,
+        pub cookie: u32,
+        pub channel_map: pa_channel_map
     }
 }
 

@@ -8,7 +8,7 @@ use self::libc::{c_int, c_char, c_void};
 use std::ffi::CString;
 pub use pulse_types::*;
 use std::ptr;
-
+use std::mem;
 
 /// Coverts a pulse error code to a String
 fn pa_err_to_string(err: c_int) -> Result<(), String> {
@@ -52,7 +52,6 @@ pub fn pa_mainloop_new() -> *mut opaque::pa_mainloop {
 /// A safe interface to pa_context_set_state_callback
 pub fn pa_context_set_state_callback(context: *mut opaque::pa_context,
     cb: cb::pa_context_notify_cb_t, userdata: *mut c_void) {
-
     assert!(!context.is_null());
     unsafe { ext::pa_context_set_state_callback(context, cb, userdata) };
 }
@@ -81,6 +80,67 @@ pub fn pa_context_connect(context: *mut opaque::pa_context, server_name: Option<
     assert!(res == 0);
 }
 
+/// A safe wrapper around pa_mainloop_run
+pub fn pa_mainloop_run(mainloop: *mut opaque::pa_mainloop, result: &mut c_int) {
+    assert!(!mainloop.is_null());
+    let res = unsafe{ ext::pa_mainloop_run(mainloop, result as *mut c_int) };
+    assert!(res == 0);
+}
+
+/// A safe wrapper around pa_context_get_state
+pub fn pa_context_get_state(context: *mut opaque::pa_context) -> enums::pa_context_state {
+    assert!(!context.is_null());
+    unsafe{ ext::pa_context_get_state(context) }
+}
+
+
+/// A safe wrapper around pa_context_get_sink_info_list
+pub fn pa_context_get_sink_info_list(context: *mut opaque::pa_context,
+    callback: cb::pa_sink_info_cb_t, userdata: *mut c_void) -> Option<*mut opaque::pa_operation> {
+
+    assert!(!context.is_null());
+    let result = unsafe{ ext::pa_context_get_sink_info_list(context, callback, userdata) };
+    if result.is_null() {
+        None
+    } else {
+        Some(result)
+    }
+}
+
+/// Utility to convert C strings to String objects
+pub fn cstr_to_string(c_str: *const c_char) -> String {
+    let len: usize = unsafe{ strlen(c_str) } as usize;
+    let s = unsafe{ String::from_raw_parts(c_str as *mut u8, len, len) };
+    let retval = s.clone();
+    unsafe{ mem::forget(s) };
+    retval
+}
+
+
+pub fn pa_context_get_server_info(context: *mut opaque::pa_context,
+    cb: cb::pa_server_info_cb_t, userdata: *mut c_void) -> Option<*mut opaque::pa_operation> {
+
+    assert!(!context.is_null());
+    let result = unsafe{ ext::pa_context_get_server_info(context, cb, userdata) };
+    if result.is_null() {
+        None
+    } else {
+        Some(result)
+    }
+}
+
+/// Hack to get the maximum channels since it is a #DEFINE not a global :(
+pub fn get_max_channels() -> Option<u8> {
+    let mut last_valid: Option<u8> = None;
+    for i in (1..255) {
+        if unsafe { ext::pa_channels_valid(i as u8) } == 0 {
+            return last_valid;
+        } else {
+            last_valid = Some(i);
+        }
+    }
+    None
+}
 
 mod ext {
     extern crate libc;
@@ -90,6 +150,8 @@ mod ext {
     #[link(name="pulse")]
     extern {
         pub fn pa_mainloop_new() -> *mut opaque::pa_mainloop;
+
+        pub fn pa_channels_valid(channels: u8) -> c_int;
 
         pub fn pa_mainloop_get_api(
             m: *mut opaque::pa_mainloop
@@ -137,5 +199,12 @@ mod ext {
             cb: cb::pa_sink_info_cb_t,
             userdata: *mut c_void
         ) -> *mut opaque::pa_operation;
+
+        pub fn pa_context_get_server_info(
+            c: *mut opaque::pa_context,
+            cb: cb::pa_server_info_cb_t,
+            userdata: *mut c_void
+        ) -> *mut opaque::pa_operation;
+
     }
 }
