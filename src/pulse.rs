@@ -60,7 +60,7 @@ pub fn pa_context_set_state_callback(context: *mut opaque::pa_context,
 
 /// A safe wrapper for pa_context_connect
 pub fn pa_context_connect(context: *mut opaque::pa_context, server_name: Option<&str>,
-    flags: enums::pa_context_flags, api: *const opaque::pa_spawn_api) {
+    flags: enums::pa_context_flags, spawn_api: Option<*const opaque::pa_spawn_api>) {
 
     assert!(!context.is_null());
 
@@ -69,7 +69,15 @@ pub fn pa_context_connect(context: *mut opaque::pa_context, server_name: Option<
         Some(name) => CString::from_slice(name.as_bytes()).as_ptr()
     };
 
-    let res = unsafe { ext::pa_context_connect(context, server, flags, api) };
+    let spawn_api_ptr: *const opaque::pa_spawn_api = match spawn_api {
+        Some(api_ptr) => {
+            assert!(!api_ptr.is_null());
+            api_ptr
+        },
+        None => ptr::null()
+    };
+
+    let res = unsafe { ext::pa_context_connect(context, server, flags, spawn_api_ptr) };
     assert!(res == 0);
 }
 
