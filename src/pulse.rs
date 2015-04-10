@@ -35,38 +35,6 @@ fn pa_err_to_string(err: c_int) -> Result<(), String> {
     }
 }
 
-/// A safe interface to pa_mainloop_get_api
-pub fn pa_mainloop_get_api(mainloop: *mut opaque::pa_mainloop) -> *mut opaque::pa_mainloop_api {
-    assert!(!mainloop.is_null());
-    let mainloop_api = unsafe { ext::pa_mainloop_get_api(mainloop) };
-    assert!(!mainloop_api.is_null());
-    return mainloop_api;
-}
-
-/// A safe interface to pa_context_new
-pub fn pa_context_new(mainloop_api: *mut opaque::pa_mainloop_api, client_name: &str) -> *mut opaque::pa_context {
-    assert!(!mainloop_api.is_null());
-    let client_name_c = CString::from_slice(client_name.as_bytes());
-    let context = unsafe{ ext::pa_context_new(mainloop_api, client_name_c.as_ptr()) };
-    assert!(!context.is_null());
-    return context;
-}
-
-/// A safe interface to pa_mainloop_new
-pub fn pa_mainloop_new() -> *mut opaque::pa_mainloop {
-    let mainloop = unsafe{ ext::pa_mainloop_new() };
-    assert!(!mainloop.is_null());
-    return mainloop;
-}
-
-
-/// A safe interface to pa_context_set_state_callback
-pub fn pa_context_set_state_callback(context: *mut opaque::pa_context,
-    cb: cb::pa_context_notify_cb_t, userdata: *mut c_void) {
-    assert!(!context.is_null());
-    unsafe { ext::pa_context_set_state_callback(context, cb, userdata) };
-}
-
 
 /// A safe wrapper for pa_context_connect
 pub fn pa_context_connect(context: *mut opaque::pa_context, server_name: Option<&str>,
@@ -337,6 +305,37 @@ pub fn pa_context_get_server_info(context: *mut opaque::pa_context,
     }
 }
 
+/// A safe interface to pa_mainloop_get_api
+pub fn pa_mainloop_get_api(mainloop: *mut opaque::pa_mainloop) -> *mut opaque::pa_mainloop_api {
+    assert!(!mainloop.is_null());
+    let mainloop_api = unsafe { ext::pa_mainloop_get_api(mainloop) };
+    assert!(!mainloop_api.is_null());
+    return mainloop_api;
+}
+
+/// A safe interface to pa_context_new
+pub fn pa_context_new(mainloop_api: *mut opaque::pa_mainloop_api, client_name: &str) -> *mut opaque::pa_context {
+    assert!(!mainloop_api.is_null());
+    let client_name_c = CString::from_slice(client_name.as_bytes());
+    let context = unsafe{ ext::pa_context_new(mainloop_api, client_name_c.as_ptr()) };
+    assert!(!context.is_null());
+    return context;
+}
+
+/// A safe interface to pa_mainloop_new
+pub fn pa_mainloop_new() -> *mut opaque::pa_mainloop {
+    let mainloop = unsafe{ ext::pa_mainloop_new() };
+    assert!(!mainloop.is_null());
+    return mainloop;
+}
+
+
+/// A safe interface to pa_context_set_state_callback
+pub fn pa_context_set_state_callback(context: *mut opaque::pa_context,
+    cb: cb::pa_context_notify_cb_t, userdata: *mut c_void) {
+    assert!(!context.is_null());
+    unsafe { ext::pa_context_set_state_callback(context, cb, userdata) };
+}
 
 mod ext {
     extern crate libc;
