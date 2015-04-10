@@ -177,7 +177,7 @@ impl Context {
     ///    getting callbacks.
     pub fn connect(&mut self, server: Option<&str>, flags: pa_context_flags) {
         let internal_guard = self.internal.lock();
-        let mut internal = internal_guard.unwrap();
+        let internal = internal_guard.unwrap();
         pa_context_connect(internal.ptr, server, flags, None);
     }
 
