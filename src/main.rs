@@ -299,13 +299,35 @@ mod async {
 fn main() {
     use pulse::*;
 
+
+    let mut mainloop = PulseAudioMainloop::new();
+    let mut context = mainloop.create_context("rs_client");
+    context.set_state_callback(move |mut context, state| {
+        println!("state: {}", state as c_int);
+        match state {
+            pa_context_state::READY => {
+                println!("calling!");
+                context.get_server_info(move |context, info| {
+                    println!("called!");
+                });
+
+            },
+            _ => {}
+        }
+
+    });
+    context.connect(None, pa_context_flags::NOAUTOSPAWN);
+    mainloop.run();
+
+
+/*
     let mut papi = pulse::PulseAudioApi::new("rs_client");
     papi.set_state_callback(|papi, state| {
         println!("hey gimme gimme callbacks {}", state as c_int);
         match state {
             pa_context_state::READY => {
                 println!("calling!");
-                papi.get_server_info(|p, i| {
+                papi.get_server_info(move |p, i| {
                     println!("called!");
                 });
 
@@ -318,7 +340,7 @@ fn main() {
 
     papi.connect(None, pulse::pa_context_flags::NOAUTOSPAWN);
     papi.run_mainloop();
-
+*/
 
     println!("sizeof pa_sink_info: {}", mem::size_of::<pulse_types::structs::pa_sink_info>());
     println!("sizeof pa_cvolume: {}", mem::size_of::<pulse_types::structs::pa_cvolume>());
