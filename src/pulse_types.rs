@@ -273,6 +273,8 @@ pub mod structs {
         pub channel_map: pa_channel_map
     }
 
+    #[repr(C)]
+    #[derive(Copy)]
     pub struct pa_format_info {
         pub encoding: pa_encoding_t,
         pub plist: *mut pa_proplist
