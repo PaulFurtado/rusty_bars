@@ -198,7 +198,7 @@ pub mod structs {
     #[derive(Copy)]
     pub struct pa_channel_map {
         channels: u8,
-        values: pa_channel_position_t
+        values: [pa_channel_position_t; 32]
     }
 
     // FIXME: this struct doesn't match up with C
@@ -225,12 +225,12 @@ pub mod structs {
         pub n_volume_steps: u32,           //**< Number of volume steps for sinks which do not support arbitrary volumes. \since 0.9.15 */
         pub card: u32,                     //**< Card index, or PA_INVALID_INDEX. \since 0.9.15 */
         pub n_ports: u32,                  //**< Number of entries in port array \since 0.9.16 */
-        pub ports: *mut c_void,
+        pub ports: *mut *mut c_void,
         //pa_sink_port_info** ports;         //**< Array of available ports, or NULL. Array is terminated by an entry set to NULL. The number of entries is stored in n_ports. \since 0.9.16 */
         pub active_port: *mut c_void,
         //pa_sink_port_info* active_port;    //**< Pointer to active port in the array, or NULL. \since 0.9.16 */
         pub n_formats: u8,
-        pub formats: *mut c_void          //**< Number of formats supported by the sink. \since 1.0 */
+        pub formats: *mut *mut c_void          //**< Number of formats supported by the sink. \since 1.0 */
         //pa_format_info **formats;          //**< Array of formats supported by the sink. \since 1.0 */
     }
 
