@@ -80,6 +80,15 @@ pub fn pa_context_connect(context: *mut opaque::pa_context, server_name: Option<
     assert!(res == 0);
 }
 
+
+/// A safe wrapper around pa_context_disconnect.
+/// Immediately/synchronously disconnect from the PulseAudio server.
+pub fn pa_context_disconnect(context: *mut opaque::pa_context) {
+    assert!(!context.is_null());
+    unsafe { ext::pa_context_disconnect(context) };
+}
+
+
 /// A safe wrapper around pa_mainloop_run
 pub fn pa_mainloop_run(mainloop: *mut opaque::pa_mainloop, result: &mut c_int) {
     assert!(!mainloop.is_null());
@@ -185,7 +194,11 @@ impl PulseAudioApi {
 }
 
 
-
+impl Drop for PulseAudioApi  {
+    fn drop(&mut self) {
+        pa_context_disconnect(self.context);
+    }
+}
 
 
 /// Utility to convert C strings to String objects
@@ -255,6 +268,8 @@ mod ext {
             flags: enums::pa_context_flags,
             api: *const opaque::pa_spawn_api
         ) -> c_int;
+
+        pub fn pa_context_disconnect(context: *mut opaque::pa_context);
 
         pub fn pa_context_get_state(
             context: *mut opaque::pa_context
