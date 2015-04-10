@@ -113,13 +113,20 @@ pub struct PulseAudioApi {
     context: *mut pa_context,
     mainloop: *mut pa_mainloop,
     mainloop_api: *mut pa_mainloop_api,
-    state_callback: Option<Box<FnMut(pa_context_state) + 'static>>
+    state_callback: Option<Box<FnMut(pa_context_state) + 'static>>,
+    server_info_callback: Option<Box<FnMut(&pa_server_info) + 'static>>,
 }
 
 
-extern fn _state_callback(context: *mut opaque::pa_context, papi: *mut c_void) {
-    let papi: &mut PulseAudioApi =  unsafe{ mem::transmute(papi) };
+extern fn _state_callback(_: *mut pa_context, papi: *mut c_void) {
+    let papi: &mut PulseAudioApi = unsafe{ &mut *(papi as *mut PulseAudioApi) };
     papi.state_callback();
+}
+
+
+extern fn _server_info_callback(_: *mut pa_context, info: *const pa_server_info, closure: *mut c_void) {
+    let cb: &mut Box<FnMut(&pa_server_info)> = unsafe{ mem::transmute(closure) };
+    cb(unsafe{ &*info });
 }
 
 
@@ -133,7 +140,8 @@ impl PulseAudioApi {
             mainloop: mainloop,
             mainloop_api: mainloop_api,
             context: context,
-            state_callback: None
+            state_callback: None,
+            server_info_callback: None,
         }
     }
 
@@ -143,15 +151,23 @@ impl PulseAudioApi {
 
     fn state_callback(&mut self) {
         match self.state_callback {
-            Some(ref mut cb) => {
-                cb(pa_context_get_state(self.context));
-            }
-            None => {
-                println!("Warning: No state callback set.");
-            }
+            Some(ref mut cb) => cb(pa_context_get_state(self.context)),
+            None => println!("Warning: No state callback set.")
         }
     }
 
+    fn server_info_callback(&mut self, info: &pa_server_info) {
+        match self.server_info_callback {
+            Some(ref mut cb) => cb(info),
+            None => println!("Warning: No state callback set.")
+        }
+    }
+
+    pub fn get_server_info<C>(&mut self, cb: C) where C: FnMut(&pa_server_info) + 'static {
+        self.server_info_callback = Some(Box::new(cb));
+        let papi: *mut PulseAudioApi = self;
+        //pa_context_set_server_info_callback(self.context, _server_info_callback, papi as *mut c_void);
+    }
 
     pub fn set_state_callback<C>(&mut self, cb: C) where C: FnMut(pa_context_state) + 'static {
         self.state_callback = Some(Box::new(cb));
