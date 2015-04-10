@@ -22,7 +22,6 @@ pub mod cb {
         *mut c_void
     );
 
-
     pub type pa_sink_info_cb_t = extern "C" fn(
         c: *mut pa_context,
         i: *const pa_sink_info,

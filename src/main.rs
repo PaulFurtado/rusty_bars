@@ -298,6 +298,12 @@ mod async {
 
 fn main() {
 
+    let mut papi = pulse::PulseAudioApi::new("rs_client");
+    papi.set_state_callback(|x| {});
+    papi.connect(None, pulse::pa_context_flags::NOAUTOSPAWN);
+    papi.run_mainloop();
+
+
     println!("sizeof pa_sink_info: {}", mem::size_of::<pulse_types::structs::pa_sink_info>());
     println!("sizeof pa_cvolume: {}", mem::size_of::<pulse_types::structs::pa_cvolume>());
 

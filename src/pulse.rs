@@ -107,6 +107,64 @@ pub fn pa_context_get_sink_info_list(context: *mut opaque::pa_context,
     }
 }
 
+
+
+pub struct PulseAudioApi {
+    context: *mut pa_context,
+    mainloop: *mut pa_mainloop,
+    mainloop_api: *mut pa_mainloop_api,
+    state_callback: Option<Box<FnMut(pa_context_state) + 'static>>
+}
+
+
+extern fn _state_callback(context: *mut opaque::pa_context, papi: *mut c_void) {
+    let papi: &mut PulseAudioApi =  unsafe{ mem::transmute(papi) };
+    papi.state_callback();
+}
+
+
+
+impl PulseAudioApi {
+    pub fn new(client_name: &str) -> PulseAudioApi {
+        let mainloop = pa_mainloop_new();
+        let mainloop_api = pa_mainloop_get_api(mainloop);
+        let context = pa_context_new(mainloop_api, client_name);
+        PulseAudioApi {
+            mainloop: mainloop,
+            mainloop_api: mainloop_api,
+            context: context,
+            state_callback: None
+        }
+    }
+
+    pub fn connect(&mut self, server: Option<&str>, flags: pa_context_flags) {
+        pa_context_connect(self.context, server, flags, None);
+    }
+
+    fn state_callback(&mut self) {
+        println!("heyyoooooo");
+    }
+
+
+    pub fn set_state_callback<C>(&mut self, cb: C) where C: FnMut(pa_context_state) + 'static {
+        self.state_callback = Some(Box::new(cb));
+        let papi: *mut PulseAudioApi = self;
+        pa_context_set_state_callback(self.context, _state_callback, papi as *mut c_void);
+    }
+
+    /// Runs the mainloop on the current thread.
+    pub fn run_mainloop(&mut self) -> Result<(), String> {
+        let mut mainloop_res: c_int = 0;
+        pa_mainloop_run(self.mainloop, &mut mainloop_res);
+        // TODO: handle errors
+        Ok(())
+    }
+}
+
+
+
+
+
 /// Utility to convert C strings to String objects
 pub fn cstr_to_string(c_str: *const c_char) -> String {
     let len: usize = unsafe{ strlen(c_str) } as usize;
