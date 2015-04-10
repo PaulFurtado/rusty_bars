@@ -3,6 +3,12 @@
 #![allow(dead_code)]
 #![allow(raw_pointer_derive)]
 
+pub use self::cb::*;
+pub use self::opaque::*;
+pub use self::enums::*;
+pub use self::structs::*;
+pub use self::types::*;
+
 
 /// For callback signatures
 pub mod cb {
