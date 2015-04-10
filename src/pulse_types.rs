@@ -25,16 +25,21 @@ pub mod cb {
     pub type pa_sink_info_cb_t = extern "C" fn(
         c: *mut pa_context,
         i: *const pa_sink_info,
-        eol: c_int, userdata:
-        *mut c_void
+        eol: c_int,
+        userdata: *mut c_void
     );
 
     pub type pa_server_info_cb_t = extern "C" fn(
-        *mut pa_context,
+        c: *mut pa_context,
         i: *const pa_server_info,
         *mut c_void
     );
 
+    pub type pa_stream_request_cb_t = extern "C" fn(
+        p: *mut pa_stream,
+        nbytes: c_int,
+        *mut c_void
+    );
 }
 
 
@@ -175,6 +180,21 @@ pub mod enums {
         PA_SINK_FLAT_VOLUME = 0x0040is,
         PA_SINK_DYNAMIC_LATENCY = 0x0080is
     }
+
+
+    #[repr(C)]
+    #[derive(Copy)]
+    pub enum pa_encoding_t {
+        PA_ENCODING_ANY,
+        PA_ENCODING_PCM,
+        PA_ENCODING_AC3_IEC61937,
+        PA_ENCODING_EAC3_IEC61937,
+        PA_ENCODING_MPEG_IEC61937,
+        PA_ENCODING_DTS_IEC61937,
+        PA_ENCODING_MPEG2_AAC_IEC61937,
+        PA_ENCODING_MAX,
+        PA_ENCODING_INVALID = -1,
+    }
 }
 
 pub mod structs {
@@ -252,6 +272,12 @@ pub mod structs {
         pub cookie: u32,
         pub channel_map: pa_channel_map
     }
+
+    pub struct pa_format_info {
+        pub encoding: pa_encoding_t,
+        pub plist: *mut pa_proplist
+    }
+
 }
 
 /// For types that are just renamed.
