@@ -142,7 +142,14 @@ impl PulseAudioApi {
     }
 
     fn state_callback(&mut self) {
-        println!("heyyoooooo");
+        match self.state_callback {
+            Some(ref mut cb) => {
+                cb(pa_context_get_state(self.context));
+            }
+            None => {
+                println!("Warning: No state callback set.");
+            }
+        }
     }
 
 

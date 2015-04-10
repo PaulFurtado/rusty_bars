@@ -299,7 +299,10 @@ mod async {
 fn main() {
 
     let mut papi = pulse::PulseAudioApi::new("rs_client");
-    papi.set_state_callback(|x| {});
+    papi.set_state_callback(|x| {
+        println!("hey gimme gimme callbacks {}", x as c_int);
+
+    });
     papi.connect(None, pulse::pa_context_flags::NOAUTOSPAWN);
     papi.run_mainloop();
 
