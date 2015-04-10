@@ -116,18 +116,27 @@ pub fn pa_context_get_sink_info_list(context: *mut opaque::pa_context,
     }
 }
 
-type StateCallback = Box<Fn(&mut PulseAudioApi, pa_context_state) + 'static>;
-type ServerInfoCallback = Box<Fn(&mut PulseAudioApi, &pa_server_info) + 'static>;
+
+
+// Types for callback closures
+type StateCallback = Fn(&mut PulseAudioApi, pa_context_state) + 'static;
+type ServerInfoCallback = Fn(&mut PulseAudioApi, &pa_server_info) + 'static;
+
+// Boxed types for callback closures
+type BoxedStateCallback = Box<StateCallback>;
+type BoxedServerInfoCallback = Box<ServerInfoCallback>;
+
+
 
 
 struct InfoCallbackWrapper {
-    callback: ServerInfoCallback,
+    callback: BoxedServerInfoCallback,
     papi: *mut PulseAudioApi
 }
 
 
 impl InfoCallbackWrapper {
-    fn new(papi: *mut PulseAudioApi, callback: ServerInfoCallback) -> InfoCallbackWrapper{
+    fn new(papi: *mut PulseAudioApi, callback: BoxedServerInfoCallback) -> InfoCallbackWrapper{
         InfoCallbackWrapper {
             papi: papi,
             callback: callback
@@ -164,7 +173,7 @@ pub struct PulseAudioApi {
     context: *mut pa_context,
     mainloop: *mut pa_mainloop,
     mainloop_api: *mut pa_mainloop_api,
-    state_cb: Option<StateCallback>,
+    state_cb: Option<BoxedStateCallback>,
 }
 
 
@@ -202,7 +211,7 @@ impl PulseAudioApi {
     }
 
     pub fn get_server_info<C>(&mut self, cb: C) where C: Fn(&mut PulseAudioApi, &pa_server_info) + 'static {
-        let mut b = Box::new(cb) as ServerInfoCallback;
+        let mut b = Box::new(cb) as BoxedServerInfoCallback;
         let mut wrapper = InfoCallbackWrapper::new(self.as_mut_ptr(), b);
         let mut boxed_wrapper = wrapper.to_box();
         let wrapper_ptr: *mut Box<InfoCallbackWrapper> = &mut boxed_wrapper;
@@ -211,7 +220,7 @@ impl PulseAudioApi {
     }
 
     pub fn set_state_callback<C>(&mut self, cb: C) where C: Fn(&mut PulseAudioApi, pa_context_state) + 'static {
-        self.state_cb = Some(Box::new(cb) as StateCallback);
+        self.state_cb = Some(Box::new(cb) as BoxedStateCallback);
         pa_context_set_state_callback(self.context, _state_callback, self.as_void_ptr());
     }
 
@@ -256,8 +265,8 @@ pub fn cstr_to_string(c_str: *const c_char) -> String {
 pub fn pa_context_get_server_info_closure<C>(context: *mut opaque::pa_context, cb: C)
     where C: Fn(&pa_server_info) + 'static {
 
-    let mut cb = Box::new(cb) as ServerInfoCallback;
-    let cbp: *mut ServerInfoCallback = &mut cb;
+    let mut cb = Box::new(cb) as BoxedServerInfoCallback;
+    let cbp: *mut BoxedServerInfoCallback = &mut cb;
     pa_context_get_server_info(context, _server_info_callback, cbp as *mut c_void);
 }
 */
