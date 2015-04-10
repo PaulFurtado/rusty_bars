@@ -297,10 +297,22 @@ mod async {
 }
 
 fn main() {
+    use pulse::*;
 
     let mut papi = pulse::PulseAudioApi::new("rs_client");
-    papi.set_state_callback(|x| {
-        println!("hey gimme gimme callbacks {}", x as c_int);
+    papi.set_state_callback(|papi, state| {
+        println!("hey gimme gimme callbacks {}", state as c_int);
+        match state {
+            pa_context_state::READY => {
+                println!("calling!");
+                papi.get_server_info(|p, i| {
+                    println!("called!");
+                });
+
+            },
+            _ => {}
+        }
+
     });
 
 

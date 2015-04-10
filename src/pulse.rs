@@ -116,14 +116,32 @@ pub fn pa_context_get_sink_info_list(context: *mut opaque::pa_context,
     }
 }
 
-type StateCallback = Box<Fn(pa_context_state) + 'static>;
+type StateCallback = Box<Fn(&mut PulseAudioApi, pa_context_state) + 'static>;
+type ServerInfoCallback = Box<Fn(&mut PulseAudioApi, &pa_server_info) + 'static>;
 
-pub struct PulseAudioApi {
-    context: *mut pa_context,
-    mainloop: *mut pa_mainloop,
-    mainloop_api: *mut pa_mainloop_api,
-    state_cb: Option<StateCallback>,
-    server_info_callback: Option<Box<Fn(&pa_server_info) + 'static>>,
+
+struct InfoCallbackWrapper {
+    callback: ServerInfoCallback,
+    papi: *mut PulseAudioApi
+}
+
+
+impl InfoCallbackWrapper {
+    fn new(papi: *mut PulseAudioApi, callback: ServerInfoCallback) -> InfoCallbackWrapper{
+        InfoCallbackWrapper {
+            papi: papi,
+            callback: callback
+        }
+    }
+
+    fn to_box(self) -> Box<InfoCallbackWrapper> {
+        Box::new(self)
+    }
+
+    fn execute(&self, info: &pa_server_info) {
+        let papi = unsafe{ &mut * self.papi };
+        (self.callback)(papi, info);
+    }
 }
 
 
@@ -133,14 +151,26 @@ extern fn _state_callback(_: *mut pa_context, papi: *mut c_void) {
 }
 
 
-extern fn _server_info_callback(_: *mut pa_context, info: *const pa_server_info, closure: *mut c_void) {
-    let cb: &mut Box<FnMut(&pa_server_info)> = unsafe{ mem::transmute(closure) };
-    cb(unsafe{ &*info });
+extern fn _server_info_callback(_: *mut pa_context, info: *const pa_server_info, userdata: *mut c_void) {
+    let wrapper_ptr = userdata as *mut Box<InfoCallbackWrapper>;
+    let wrapper: &Box<InfoCallbackWrapper> = unsafe{ &*wrapper_ptr };
+    wrapper.execute(unsafe{ &*info });
 }
 
 
 
+/// Rusty wrapper for PulseAudio's API.
+pub struct PulseAudioApi {
+    context: *mut pa_context,
+    mainloop: *mut pa_mainloop,
+    mainloop_api: *mut pa_mainloop_api,
+    state_cb: Option<StateCallback>,
+}
+
+
 impl PulseAudioApi {
+    /// Create a new PulseAudioApi instance.
+    /// client_name is the name this client will appear as to PulseAudio
     pub fn new(client_name: &str) -> PulseAudioApi {
         let mainloop = pa_mainloop_new();
         let mainloop_api = pa_mainloop_get_api(mainloop);
@@ -150,39 +180,39 @@ impl PulseAudioApi {
             mainloop_api: mainloop_api,
             context: context,
             state_cb: None,
-            server_info_callback: None,
         }
     }
+
+
+
 
     pub fn connect(&mut self, server: Option<&str>, flags: pa_context_flags) {
         pa_context_connect(self.context, server, flags, None);
     }
 
+
     fn state_callback(&mut self) {
+        let self_ptr: *mut Self = self;
+        let self2 = unsafe { &mut *self_ptr };
+
         match self.state_cb {
-            Some(ref mut cb) => cb(pa_context_get_state(self.context)),
+            Some(ref mut cb) => cb(self2, pa_context_get_state(self.context)),
             None => println!("Warning: No state callback set.")
         }
     }
 
-    fn server_info_callback(&mut self, info: &pa_server_info) {
-        match self.server_info_callback {
-            Some(ref mut cb) => cb(info),
-            None => println!("Warning: No state callback set.")
-        }
+    pub fn get_server_info<C>(&mut self, cb: C) where C: Fn(&mut PulseAudioApi, &pa_server_info) + 'static {
+        let mut b = Box::new(cb) as ServerInfoCallback;
+        let mut wrapper = InfoCallbackWrapper::new(self.as_mut_ptr(), b);
+        let mut boxed_wrapper = wrapper.to_box();
+        let wrapper_ptr: *mut Box<InfoCallbackWrapper> = &mut boxed_wrapper;
+        pa_context_get_server_info(self.context, _server_info_callback, wrapper_ptr as *mut c_void);
+
     }
 
-    pub fn get_server_info<C>(&mut self, cb: C) where C: Fn(&pa_server_info) {
-
-        //self.server_info_callback = Some(b);
-        let papi: *mut PulseAudioApi = self;
-        //pa_context_set_server_info_callback(self.context, _server_info_callback, papi as *mut c_void);
-    }
-
-    pub fn set_state_callback<C>(&mut self, cb: C) where C: Fn(pa_context_state) + 'static {
+    pub fn set_state_callback<C>(&mut self, cb: C) where C: Fn(&mut PulseAudioApi, pa_context_state) + 'static {
         self.state_cb = Some(Box::new(cb) as StateCallback);
-        let papi: *mut PulseAudioApi = self;
-        pa_context_set_state_callback(self.context, _state_callback, papi as *mut c_void);
+        pa_context_set_state_callback(self.context, _state_callback, self.as_void_ptr());
     }
 
     /// Runs the mainloop on the current thread.
@@ -191,6 +221,16 @@ impl PulseAudioApi {
         pa_mainloop_run(self.mainloop, &mut mainloop_res);
         // TODO: handle errors
         Ok(())
+    }
+
+    /// Gets a raw pointer to this PulseAudioApi instance
+    fn as_mut_ptr(&mut self) -> *mut Self {
+        self
+    }
+
+    /// Gets a raw c_void pointer to this PulseAudioApi instance
+    fn as_void_ptr(&mut self) -> *mut c_void {
+        self.as_mut_ptr() as *mut c_void
     }
 }
 
@@ -210,6 +250,18 @@ pub fn cstr_to_string(c_str: *const c_char) -> String {
     unsafe{ mem::forget(s) };
     retval
 }
+
+
+/*
+pub fn pa_context_get_server_info_closure<C>(context: *mut opaque::pa_context, cb: C)
+    where C: Fn(&pa_server_info) + 'static {
+
+    let mut cb = Box::new(cb) as ServerInfoCallback;
+    let cbp: *mut ServerInfoCallback = &mut cb;
+    pa_context_get_server_info(context, _server_info_callback, cbp as *mut c_void);
+}
+*/
+
 
 
 pub fn pa_context_get_server_info(context: *mut opaque::pa_context,
