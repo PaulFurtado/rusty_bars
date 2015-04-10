@@ -116,14 +116,14 @@ pub fn pa_context_get_sink_info_list(context: *mut opaque::pa_context,
     }
 }
 
-
+type StateCallback = Box<Fn(pa_context_state) + 'static>;
 
 pub struct PulseAudioApi {
     context: *mut pa_context,
     mainloop: *mut pa_mainloop,
     mainloop_api: *mut pa_mainloop_api,
-    state_callback: Option<Box<FnMut(pa_context_state) + 'static>>,
-    server_info_callback: Option<Box<FnMut(&pa_server_info) + 'static>>,
+    state_cb: Option<StateCallback>,
+    server_info_callback: Option<Box<Fn(&pa_server_info) + 'static>>,
 }
 
 
@@ -149,7 +149,7 @@ impl PulseAudioApi {
             mainloop: mainloop,
             mainloop_api: mainloop_api,
             context: context,
-            state_callback: None,
+            state_cb: None,
             server_info_callback: None,
         }
     }
@@ -159,7 +159,7 @@ impl PulseAudioApi {
     }
 
     fn state_callback(&mut self) {
-        match self.state_callback {
+        match self.state_cb {
             Some(ref mut cb) => cb(pa_context_get_state(self.context)),
             None => println!("Warning: No state callback set.")
         }
@@ -172,14 +172,15 @@ impl PulseAudioApi {
         }
     }
 
-    pub fn get_server_info<C>(&mut self, cb: C) where C: FnMut(&pa_server_info) + 'static {
-        self.server_info_callback = Some(Box::new(cb));
+    pub fn get_server_info<C>(&mut self, cb: C) where C: Fn(&pa_server_info) {
+
+        //self.server_info_callback = Some(b);
         let papi: *mut PulseAudioApi = self;
         //pa_context_set_server_info_callback(self.context, _server_info_callback, papi as *mut c_void);
     }
 
-    pub fn set_state_callback<C>(&mut self, cb: C) where C: FnMut(pa_context_state) + 'static {
-        self.state_callback = Some(Box::new(cb));
+    pub fn set_state_callback<C>(&mut self, cb: C) where C: Fn(pa_context_state) + 'static {
+        self.state_cb = Some(Box::new(cb) as StateCallback);
         let papi: *mut PulseAudioApi = self;
         pa_context_set_state_callback(self.context, _state_callback, papi as *mut c_void);
     }
