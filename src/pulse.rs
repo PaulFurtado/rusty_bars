@@ -309,5 +309,11 @@ mod ext {
             n_formats: c_int,
             p: *mut pa_proplist
         ) -> *mut opaque::pa_stream;
+
+        pub fn pa_stream_set_read_callback(
+            p: *mut opaque::pa_stream,
+            cb: pa_stream_request_cb_t,
+            userdata: *mut c_void
+        );
     }
 }

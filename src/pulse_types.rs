@@ -25,16 +25,21 @@ pub mod cb {
     pub type pa_sink_info_cb_t = extern "C" fn(
         c: *mut pa_context,
         i: *const pa_sink_info,
-        eol: c_int, userdata:
-        *mut c_void
+        eol: c_int,
+        userdata: *mut c_void
     );
 
     pub type pa_server_info_cb_t = extern "C" fn(
-        *mut pa_context,
+        c: *mut pa_context,
         i: *const pa_server_info,
         *mut c_void
     );
 
+    pub type pa_stream_request_cb_t = extern "C" fn(
+        p: *mut pa_stream,
+        nbytes: c_int,
+        *mut c_void
+    );
 }
 
 
