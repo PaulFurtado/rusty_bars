@@ -288,7 +288,6 @@ mod ext {
 
         pub fn pa_proplist_new() -> *mut opaque::pa_proplist;
 
-
         pub fn pa_strerror(error: c_int) -> *const c_char;
 
         pub fn pa_context_get_sink_info_list(
@@ -303,5 +302,12 @@ mod ext {
             userdata: *mut c_void
         ) -> *mut opaque::pa_operation;
 
+        pub fn pa_stream_new_extended(
+            c: *mut opaque::pa_context,
+            name: *const c_char,
+            formats: *const *const pa_format_info,
+            n_formats: c_int,
+            p: *mut pa_proplist
+        ) -> *mut opaque::pa_stream;
     }
 }
