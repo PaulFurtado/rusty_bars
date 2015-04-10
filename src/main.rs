@@ -223,78 +223,7 @@ fn run_analyzer(dev: &str) {
     }
 }
 
-mod async {
-    extern crate libc;
-    use libc::{c_void, c_int};
-    use pulse::*;
-    use std::mem::transmute;
-    use std::mem;
 
-
-    extern "C" fn state_callback(context: *mut opaque::pa_context, userdata: *mut c_void) {
-        let state = pa_context_get_state(context);
-
-        let myint_ptr = userdata as *mut usize;
-        let myint = unsafe{ *myint_ptr };
-
-        println!("i haz state. myint={}, state={}", myint, state as c_int);
-
-        match state {
-            enums::pa_context_state::READY => {
-                println!("ready to twerk!");
-                pa_context_get_sink_info_list(context, sink_list_callback, myint_ptr as *mut c_void);
-                pa_context_get_server_info(context, server_info_callback, myint_ptr as *mut c_void);
-            },
-            _ => {}
-        }
-    }
-
-    extern "C" fn server_info_callback(c: *mut opaque::pa_context, info: *const structs::pa_server_info, userdata: *mut c_void) {
-
-        let info = unsafe{ *info };
-        println!("===================== server_info_callback =======================");
-        println!("user_name: {}", cstr_to_string(info.user_name));
-        println!("host_name: {}", cstr_to_string(info.host_name));
-        println!("server_version: {}", cstr_to_string(info.server_version));
-        println!("server_name: {}", cstr_to_string(info.server_name));
-        println!("default_sink_name: {}", cstr_to_string(info.default_sink_name));
-        println!("default_source_name: {}", cstr_to_string(info.default_source_name));
-        println!("===================== end server_info_callback =======================");
-
-    }
-
-
-    extern "C" fn sink_list_callback(c: *mut opaque::pa_context,
-        info: *const structs::pa_sink_info, eol: c_int, userdata: *mut c_void) {
-        // XXX: Memory errors. I think that pa_sink_info struct doesn't match
-        // XXX: up exactly right.
-        println!("eol: {}", eol);
-
-
-        if info.is_null() {
-            println!("null sink lol");
-        } else {
-            let info = unsafe{ *info };
-            println!("Callback for card: {}", cstr_to_string(info.name));
-        }
-        //println!("Callback for card: {}", cstr_to_string(info.name));
-        //unsafe{ mem::forget(info) };
-    }
-
-    pub fn main_async() {
-        let mainloop = pa_mainloop_new();
-        let mainloop_api = pa_mainloop_get_api(mainloop);
-        let context = pa_context_new(mainloop_api, "rust_viz");
-        let mut myint: usize = 12345;
-        let myint_ptr: *mut usize = (&mut myint) as *mut usize;
-
-        pa_context_set_state_callback(context, state_callback, myint_ptr as *mut c_void);
-        pa_context_connect(context, None, enums::pa_context_flags::NOAUTOSPAWN, None);
-
-        let mut mainloop_res: c_int = 0;
-        pa_mainloop_run(mainloop, &mut mainloop_res);
-    }
-}
 
 fn main() {
     use pulse::*;
@@ -308,7 +237,14 @@ fn main() {
             pa_context_state::READY => {
                 println!("calling!");
                 context.get_server_info(move |context, info| {
-                    println!("called!");
+                    println!("===================== server_info_callback =======================");
+                    println!("user_name: {}", cstr_to_string(info.user_name));
+                    println!("host_name: {}", cstr_to_string(info.host_name));
+                    println!("server_version: {}", cstr_to_string(info.server_version));
+                    println!("server_name: {}", cstr_to_string(info.server_name));
+                    println!("default_sink_name: {}", cstr_to_string(info.default_sink_name));
+                    println!("default_source_name: {}", cstr_to_string(info.default_source_name));
+                    println!("===================== end server_info_callback =======================");
                 });
 
             },
@@ -320,32 +256,6 @@ fn main() {
     mainloop.run();
 
 
-/*
-    let mut papi = pulse::PulseAudioApi::new("rs_client");
-    papi.set_state_callback(|papi, state| {
-        println!("hey gimme gimme callbacks {}", state as c_int);
-        match state {
-            pa_context_state::READY => {
-                println!("calling!");
-                papi.get_server_info(move |p, i| {
-                    println!("called!");
-                });
-
-            },
-            _ => {}
-        }
-
-    });
-
-
-    papi.connect(None, pulse::pa_context_flags::NOAUTOSPAWN);
-    papi.run_mainloop();
-*/
-
-    println!("sizeof pa_sink_info: {}", mem::size_of::<pulse_types::structs::pa_sink_info>());
-    println!("sizeof pa_cvolume: {}", mem::size_of::<pulse_types::structs::pa_cvolume>());
-
-    return async::main_async();
 
     let args = os::args();
     if args.len() != 2 {
