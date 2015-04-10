@@ -229,7 +229,7 @@ fn main() {
     use pulse::*;
 
 
-    let mut mainloop = PulseAudioMainloop::new();
+    let mainloop = PulseAudioMainloop::new();
     let mut context = mainloop.create_context("rs_client");
     context.set_state_callback(move |mut context, state| {
         println!("state: {}", state as c_int);
