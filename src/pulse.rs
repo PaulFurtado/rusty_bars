@@ -9,8 +9,16 @@ use std::ffi::CString;
 pub use pulse_types::*;
 use std::ptr;
 use std::mem;
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::rc::{Rc, Weak};
+use std::sync::{Arc, Mutex};
+
+
+// Types for callback closures
+type StateCallback = Fn(Context, pa_context_state) + Send;
+type ServerInfoCallback = Fn(Context, &pa_server_info) + Send;
+
+// Boxed types for callback closures
+type BoxedStateCallback = Box<StateCallback>;
+type BoxedServerInfoCallback = Box<ServerInfoCallback>;
 
 
 /// Coverts a pulse error code to a String
@@ -84,68 +92,6 @@ pub fn pa_context_connect(context: *mut opaque::pa_context, server_name: Option<
 }
 
 
-/// A safe wrapper around pa_context_disconnect.
-/// Immediately/synchronously disconnect from the PulseAudio server.
-pub fn pa_context_disconnect(context: *mut opaque::pa_context) {
-    assert!(!context.is_null());
-    unsafe { ext::pa_context_disconnect(context) };
-}
-
-
-/// A safe wrapper around pa_mainloop_run
-pub fn pa_mainloop_run(mainloop: *mut opaque::pa_mainloop, result: &mut c_int) {
-    assert!(!mainloop.is_null());
-    let res = unsafe{ ext::pa_mainloop_run(mainloop, result as *mut c_int) };
-    assert!(res == 0);
-}
-
-/// A safe wrapper around pa_context_get_state
-pub fn pa_context_get_state(context: *mut opaque::pa_context) -> enums::pa_context_state {
-    assert!(!context.is_null());
-    unsafe{ ext::pa_context_get_state(context) }
-}
-
-
-/// A safe wrapper around pa_context_get_sink_info_list
-pub fn pa_context_get_sink_info_list(context: *mut opaque::pa_context,
-    callback: cb::pa_sink_info_cb_t, userdata: *mut c_void) -> Option<*mut opaque::pa_operation> {
-
-    assert!(!context.is_null());
-    let result = unsafe{ ext::pa_context_get_sink_info_list(context, callback, userdata) };
-    if result.is_null() {
-        None
-    } else {
-        Some(result)
-    }
-}
-
-
-
-// Types for callback closures
-type StateCallback = Fn(Context, pa_context_state) + Send;
-type ServerInfoCallback = Fn(Context, &pa_server_info) + Send;
-
-// Boxed types for callback closures
-type BoxedStateCallback = Box<StateCallback>;
-type BoxedServerInfoCallback = Box<ServerInfoCallback>;
-
-
-
-
-/// State callback for C to call. Takes a ContextInternal and calls its
-/// server_info_callback method.
-extern fn _state_callback(_: *mut pa_context, context: *mut c_void) {
-    let context_internal = unsafe{ &* (context as *mut ContextInternal) };
-    context_internal.state_callback();
-}
-
-/// Server info callback for C to call. Takes a ContextInternal and calls its
-/// server_info_callback method.
-extern fn _server_info_callback(_: *mut pa_context, info: *const pa_server_info, context: *mut c_void) {
-    let context_internal = unsafe{ &* (context as *mut ContextInternal) };
-    context_internal.server_info_callback(unsafe{ &*info });
-}
-
 
 /// A struct which wraps the PulseAudio async main loop.
 pub struct PulseAudioMainloop {
@@ -194,7 +140,7 @@ impl Context {
     /// Get a new PulseAudio context. It's probably easier to get this via the
     /// mainloop.
     pub fn new(mainloop: &PulseAudioMainloop, client_name: &str) -> Context{
-        let mut context = Context {
+        let context = Context {
             internal: Arc::new(Mutex::new(ContextInternal::new(mainloop, client_name))),
         };
         {
@@ -304,7 +250,7 @@ impl ContextInternal {
     /// Called back for state changes. Wraps the user's closure
     fn state_callback(&self) {
         let state = self.get_state();
-        let mut external = self.external.clone().unwrap();
+        let external = self.external.clone().unwrap();
         match self.state_cb {
             Some(ref cb) => cb(external, state),
             None => println!("warning: no context state callback set")
@@ -313,7 +259,7 @@ impl ContextInternal {
 
     /// Called back for get_server_info. Wraps the user's closure
     fn server_info_callback(&self, info: &pa_server_info) {
-        let mut external = self.external.clone().unwrap();
+        let external = self.external.clone().unwrap();
         match self.server_info_cb {
             Some(ref cb) => cb(external, info),
             None => println!("warning: no server info callback is set"),
@@ -330,46 +276,58 @@ pub fn cstr_to_string(c_str: *const c_char) -> String {
     retval
 }
 
+/// State callback for C to call. Takes a ContextInternal and calls its
+/// server_info_callback method.
+extern fn _state_callback(_: *mut pa_context, context: *mut c_void) {
+    let context_internal = unsafe{ &* (context as *mut ContextInternal) };
+    context_internal.state_callback();
+}
 
-
-
-type ServerInfoRawCb = (Fn(&pa_server_info) + Send);
-type BoxedServerInfoRawCb = Box<ServerInfoRawCb>;
-
-
-
-pub fn pa_context_get_server_info_closure<C>(context: *mut pa_context, cb: C) where C: FnMut(&pa_server_info), C: Send {
-
-    let boxed_cb: &mut Box<C> = &mut Box::new(cb);
-    println!("Rectangle occupies {} bytes in the stack",
-             mem::size_of_val(boxed_cb));
-    let boxed_cb_ptr: *mut Box<C> = boxed_cb;
-    let ptr_num = boxed_cb_ptr as u64;
-    println!("created box: {:x}", ptr_num);
-    unsafe{ mem::forget(boxed_cb) };
-    //unsafe{ mem::forget(boxed_cb_ptr) };
-    pa_context_get_server_info(context, pa_context_get_server_info_closure_cb::<C>, boxed_cb_ptr as *mut c_void);
-    unsafe{ mem::forget(boxed_cb_ptr) };
-
+/// Server info callback for C to call. Takes a ContextInternal and calls its
+/// server_info_callback method.
+extern fn _server_info_callback(_: *mut pa_context, info: *const pa_server_info, context: *mut c_void) {
+    let context_internal = unsafe{ &* (context as *mut ContextInternal) };
+    context_internal.server_info_callback(unsafe{ &*info });
 }
 
 
-extern "C" fn pa_context_get_server_info_closure_cb<C>(_: *mut pa_context, info: *const pa_server_info, userdata: *mut c_void) where C: FnMut(&pa_server_info), C: Send {
-    println!("ptr num: {:x}", userdata as u64);
-    let cb: &mut Box<C> = unsafe{ &mut * (userdata as *mut Box<C>)  };
-    let ptr_num = (cb as *const Box<C>) as u64;
-    println!("ptr num: {:x}", ptr_num);
+/// A rust wrapper around pa_context_disconnect.
+/// Immediately/synchronously disconnect from the PulseAudio server.
+pub fn pa_context_disconnect(context: *mut opaque::pa_context) {
+    assert!(!context.is_null());
+    unsafe { ext::pa_context_disconnect(context) };
+}
 
-    let info: pa_server_info = unsafe{ *info };
-    println!("got info");
-    cb(&info);
+/// A rust wrapper around pa_mainloop_run
+pub fn pa_mainloop_run(mainloop: *mut opaque::pa_mainloop, result: &mut c_int) {
+    assert!(!mainloop.is_null());
+    let res = unsafe{ ext::pa_mainloop_run(mainloop, result as *mut c_int) };
+    assert!(res == 0);
+}
+
+/// A rust wrapper around pa_context_get_state
+pub fn pa_context_get_state(context: *mut opaque::pa_context) -> enums::pa_context_state {
+    assert!(!context.is_null());
+    unsafe{ ext::pa_context_get_state(context) }
 }
 
 
+/// A rust wrapper around pa_context_get_sink_info_list
+pub fn pa_context_get_sink_info_list(context: *mut opaque::pa_context,
+    callback: cb::pa_sink_info_cb_t, userdata: *mut c_void) -> Option<*mut opaque::pa_operation> {
 
+    assert!(!context.is_null());
+    let result = unsafe{ ext::pa_context_get_sink_info_list(context, callback, userdata) };
+    if result.is_null() {
+        None
+    } else {
+        Some(result)
+    }
+}
+
+/// A rust wrapper around pa_context_get_server_info
 pub fn pa_context_get_server_info(context: *mut opaque::pa_context,
     cb: cb::pa_server_info_cb_t, userdata: *mut c_void) -> Option<*mut opaque::pa_operation> {
-
     assert!(!context.is_null());
     let result = unsafe{ ext::pa_context_get_server_info(context, cb, userdata) };
     if result.is_null() {
@@ -379,18 +337,6 @@ pub fn pa_context_get_server_info(context: *mut opaque::pa_context,
     }
 }
 
-/// Hack to get the maximum channels since it is a #DEFINE not a global :(
-pub fn get_max_channels() -> Option<u8> {
-    let mut last_valid: Option<u8> = None;
-    for i in (1..255) {
-        if unsafe { ext::pa_channels_valid(i as u8) } == 0 {
-            return last_valid;
-        } else {
-            last_valid = Some(i);
-        }
-    }
-    None
-}
 
 mod ext {
     extern crate libc;
