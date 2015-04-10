@@ -226,7 +226,6 @@ pub mod structs {
         values: [pa_channel_position_t; 32]
     }
 
-    // FIXME: this struct doesn't match up with C
     #[repr(C)]
     #[derive(Copy)]
     pub struct pa_sink_info {
