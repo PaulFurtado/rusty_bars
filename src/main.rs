@@ -7,6 +7,7 @@ extern crate libc;
 use self::libc::{c_int, c_char, size_t};
 use std::ptr;
 use std::os;
+use std::mem;
 use std::mem::transmute;
 use std::ffi::CString;
 use std::str::from_utf8;
@@ -267,7 +268,15 @@ mod async {
         info: *const structs::pa_sink_info, eol: c_int, userdata: *mut c_void) {
         // XXX: Memory errors. I think that pa_sink_info struct doesn't match
         // XXX: up exactly right.
-        //let info = unsafe{ *info };
+        println!("eol: {}", eol);
+
+
+        if info.is_null() {
+            println!("null sink lol");
+        } else {
+            let info = unsafe{ *info };
+            println!("Callback for card: {}", cstr_to_string(info.name));
+        }
         //println!("Callback for card: {}", cstr_to_string(info.name));
         //unsafe{ mem::forget(info) };
     }
@@ -288,8 +297,11 @@ mod async {
 }
 
 fn main() {
+
+    println!("sizeof pa_sink_info: {}", mem::size_of::<pulse_types::structs::pa_sink_info>());
+    println!("sizeof pa_cvolume: {}", mem::size_of::<pulse_types::structs::pa_cvolume>());
+
     return async::main_async();
-    //async::main();
 
     let args = os::args();
     if args.len() != 2 {
