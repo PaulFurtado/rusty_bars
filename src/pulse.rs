@@ -17,11 +17,18 @@ use std::io::{Reader, Writer, IoResult, IoError, IoErrorKind};
 type StateCallback = Fn(Context, pa_context_state) + Send;
 type ServerInfoCallback = Fn(Context, &pa_server_info) + Send;
 type SinkInfoCallback = Fn(Context, Option<&pa_sink_info>) + Send;
+type SubscriptionCallback = Fn(Context, pa_subscription_mask, pa_subscription_event_type) + Send;
+type PaContextSuccessCallback = Fn(Context, bool) + Send;
+
 
 // Boxed types for callback closures
 type BoxedStateCallback = Box<StateCallback>;
 type BoxedServerInfoCallback = Box<ServerInfoCallback>;
 type BoxedSinkInfoCallback = Box<SinkInfoCallback>;
+type BoxedSubscriptionCallback = Box<SubscriptionCallback>;
+type BoxedPaContextSuccessCallback = Box<PaContextSuccessCallback>;
+
+
 
 
 /// Coverts a pulse error code to a String
@@ -162,7 +169,7 @@ impl Context {
     }
 
     /// Get information about a sink using its name.
-    //  PulseAudio uses the same callback type for getting a single sink as
+    /// PulseAudio uses the same callback type for getting a single sink as
     /// getting the list of all sinks, so a single sink works like a single
     /// element list. You should get two callbacks from this function: one with
     /// the information about the sink, and one with None indicating the end of
@@ -173,6 +180,33 @@ impl Context {
         internal.sink_info_cb = Some(Box::new(cb) as BoxedSinkInfoCallback);
         pa_context_get_sink_info_by_name(internal.ptr, name, _sink_info_callback, internal.as_void_ptr());
     }
+
+    /// Adds an event subscription
+    pub fn add_subscription(&self, mask: pa_subscription_mask) {
+        let internal_guard = self.internal.lock();
+        let mut internal = internal_guard.unwrap();
+        internal.subscriptions.add(mask);
+        let new_mask = internal.subscriptions.get_mask();
+        pa_context_subscribe(internal.ptr, new_mask, _subscription_success_callback, internal.as_void_ptr());
+    }
+
+    /// Removes an event subscription
+    pub fn remove_subscription(&self, mask: pa_subscription_mask) {
+        let internal_guard = self.internal.lock();
+        let mut internal = internal_guard.unwrap();
+        internal.subscriptions.remove(mask);
+        let new_mask = internal.subscriptions.get_mask();
+        pa_context_subscribe(internal.ptr, new_mask, _subscription_success_callback, internal.as_void_ptr());
+    }
+
+    /// Sets the callback for subscriptions
+    pub fn set_event_callback(&self) {
+        let internal_guard = self.internal.lock();
+        let mut internal = internal_guard.unwrap();
+        pa_context_set_subscribe_callback(internal.ptr, _subscription_event_callback, internal.as_void_ptr());
+    }
+
+
 }
 
 
@@ -188,7 +222,9 @@ struct ContextInternal {
     server_info_cb: Option<BoxedServerInfoCallback>,
     /// Callback closure for getting sink info.  Called once for for each
     /// element in the list of sinks
-    sink_info_cb: Option<BoxedSinkInfoCallback>
+    sink_info_cb: Option<BoxedSinkInfoCallback>,
+    /// Manages subscriptions to events
+    subscriptions: SubscriptionManager,
 }
 
 
@@ -211,6 +247,7 @@ impl ContextInternal {
             state_cb: None,
             server_info_cb: None,
             sink_info_cb: None,
+            subscriptions: SubscriptionManager::new()
         }
     }
 
@@ -233,7 +270,6 @@ impl ContextInternal {
     fn as_mut_ptr(&mut self) -> *mut ContextInternal {
         self
     }
-
 
     /// Called back for state changes. Wraps the user's closure
     fn state_callback(&self) {
@@ -263,7 +299,55 @@ impl ContextInternal {
         }
     }
 
+    fn event_callback(&self, t: pa_subscription_event_type, idx: u32) {
+        println!("called back for event: {}, idx: {}", t as c_int, idx);
+    }
+
+    fn subscription_success_callback(&self, success: bool) {
+        println!("subscribed: {}", success);
+    }
+
 }
+
+
+struct SubscriptionManager {
+    mask: c_int,
+
+}
+
+impl SubscriptionManager {
+    /// Create a new SubscriptionManager
+    fn new() -> SubscriptionManager {
+        SubscriptionManager {
+            mask: 0,
+        }
+    }
+
+    /// Get the current subscription mask
+    pub fn get_mask(&self) -> c_int {
+        self.mask
+    }
+
+    /// Add a subscription
+    pub fn add(&mut self, sub: pa_subscription_mask) {
+        self.mask |= sub as c_int;
+    }
+
+    /// Remove a subscription
+    pub fn remove(&mut self, sub: pa_subscription_mask) {
+        self.mask &= !(sub as c_int);
+    }
+
+    /// Check iof a subscription is enabled
+    pub fn is_enabled(&self, sub: pa_subscription_mask) -> bool {
+        let sub_int = sub as c_int;
+        (self.mask & sub_int) == sub_int
+    }
+}
+
+
+
+
 
 /// Utility to convert C strings to String objects
 /// TODO: standard library
@@ -298,6 +382,19 @@ extern fn _sink_info_callback(_: *mut pa_context, info: *const pa_sink_info, eol
         context_internal.sink_info_callback(Some(unsafe{ &*info }));
     }
 }
+
+/// Subscription callback for C to call.
+extern fn _subscription_event_callback(_: *mut pa_context, t: pa_subscription_event_type, idx: u32, context: *mut c_void) {
+    let context_internal = unsafe{ &* (context as *mut ContextInternal) };
+    context_internal.event_callback(t, idx);
+}
+
+/// Called back to tell you if a subscription succeded or failed.
+extern fn _subscription_success_callback(_: *mut pa_context, success: c_int,  context: *mut c_void) {
+    let context_internal = unsafe{ &* (context as *mut ContextInternal) };
+    context_internal.subscription_success_callback(success==1);
+}
+
 
 /// A safe interface to pa_context_set_state_callback
 pub fn pa_context_set_state_callback(context: *mut opaque::pa_context,
@@ -384,7 +481,7 @@ pub fn pa_context_get_sink_info_by_name(c: *mut pa_context, name: &str, cb: pa_s
 }
 
 /// Subscribe to an event
-pub fn pa_context_subscribe(c: *mut pa_context, m: pa_subscription_mask, cb: pa_context_success_cb_t, userdata: *mut c_void) {
+pub fn pa_context_subscribe(c: *mut pa_context, m: c_int, cb: pa_context_success_cb_t, userdata: *mut c_void) {
     assert!(!c.is_null());
     unsafe{ ext::pa_context_subscribe(c, m, cb, userdata) };
 }
@@ -394,6 +491,7 @@ pub fn pa_context_set_subscribe_callback(c: *mut pa_context, cb: pa_context_subs
     assert!(!c.is_null());
     unsafe{ ext::pa_context_set_subscribe_callback(c, cb, userdata) };
 }
+
 
 
 struct PulseAudioStream {
@@ -506,7 +604,7 @@ mod ext {
 
         pub fn pa_context_subscribe(
             c: *mut opaque::pa_context,
-            m: pa_subscription_mask,
+            m: c_int,
             cb: pa_context_success_cb_t,
             userdata: *mut c_void
         ) -> *mut opaque::pa_operation;

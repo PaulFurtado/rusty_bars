@@ -264,6 +264,9 @@ fn main() {
                                 println!("monitor_source index: {}", info.monitor_source);
                                 println!("driver: {}", info.get_driver());
                                 println!("===================== end sink_info_callback =======================");
+
+                                context.set_event_callback();
+                                context.add_subscription(pa_subscription_mask::SERVER);
                             },
                             None => {}
                         }
