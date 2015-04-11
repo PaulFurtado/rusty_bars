@@ -181,6 +181,7 @@ impl Drop for PulseSimple {
 
 
 
+/// Outputs an ncurses based spectrum analyzer over the given device
 fn run_analyzer(dev: &str) {
     // The sample spec to record from pulseaudio at
     let sample_spec = PulseSampleSpec{
@@ -206,9 +207,12 @@ fn run_analyzer(dev: &str) {
     let mut buffer = buffer_vec.as_mut_slice();
 
     // Initialize pulseaudio
-    let mut pulse = PulseSimple::new(dev, StreamDirection::StreamRecord, &sample_spec).unwrap();
+    // let mut pulse = PulseSimple::new(dev, StreamDirection::StreamRecord, &sample_spec).unwrap();
+    let mainloop = pulse::PulseAudioMainloop::new();
+    let mut context = mainloop.create_context("rs_client");
 
-
+    // TODO: turn this into a read callback
+    /*
     loop {
         pulse.read(buffer).unwrap();
         let output = fft.execute(buffer);
@@ -221,6 +225,10 @@ fn run_analyzer(dev: &str) {
         //let temp: Vec<String> = output.iter().map(|x| format!("{}", x)).collect();
         //println!("{}", temp.connect(", "));
     }
+     */
+
+    context.connect(None, pulse::pa_context_flags::NOAUTOSPAWN);
+    mainloop.run();
 }
 
 
@@ -254,8 +262,6 @@ fn main() {
     });
     context.connect(None, pa_context_flags::NOAUTOSPAWN);
     mainloop.run();
-
-
 
     let args = os::args();
     if args.len() != 2 {
