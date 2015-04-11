@@ -182,6 +182,49 @@ impl Drop for PulseSimple {
 }
 
 
+fn simple_run_analyzer(dev: &str) {
+    // The sample spec to record from pulseaudio at
+    let sample_spec = PulseSampleSpec{
+        format: PA_SAMPLE_S16LE,
+        rate: 44100,
+        channels: 2
+    };
+
+    let mut vis = visualizer::Visualizer::new();
+    let width = vis.get_width();
+    // TODO: compute_input_size is totally broken.
+    let fft_size = analyze_spectrum::compute_input_size(max(width, 512));
+
+    // Initialize the FFT first so that we don't hold up pulseaudio while
+    // waiting for the FFT planner
+    let mut fft = analyze_spectrum::AudioFFT::new(fft_size, 2);
+
+    // Initialize the buffer we use for reading from pulse audio
+    let mut buffer_vec: Vec<u8> = Vec::with_capacity(fft.get_buf_size());
+    for _ in range(0, fft.get_buf_size()) {
+        buffer_vec.push(0);
+    }
+    let mut buffer = buffer_vec.as_mut_slice();
+
+    // Initialize pulseaudio
+    let mut pulse = PulseSimple::new(dev, StreamDirection::StreamRecord, &sample_spec).unwrap();
+
+
+    loop {
+        pulse.read(buffer).unwrap();
+        let output = fft.execute(buffer);
+        //println!("sup");
+        match vis.render_frame(output) {
+            Err(x) => panic!("error: {}", x),
+            Ok(_) => {}
+        }
+        // Commented out code below is for pumping the data to a client
+        //let temp: Vec<String> = output.iter().map(|x| format!("{}", x)).collect();
+        //println!("{}", temp.connect(", "));
+    }
+}
+
+
 
 /// Outputs an ncurses based spectrum analyzer over the given device
 fn run_analyzer(dev: &str) {
@@ -266,6 +309,10 @@ fn main() {
                                 println!("monitor_source index: {}", info.monitor_source);
                                 println!("driver: {}", info.get_driver());
                                 println!("===================== end sink_info_callback =======================");
+
+                                simple_run_analyzer(info.get_monitor_source_name());
+                                return;
+
 
                                 context.set_event_callback(move |context, event, index| {
                                     let facility = (event & (pa_subscription_event_type::FACILITY_MASK as c_int));
