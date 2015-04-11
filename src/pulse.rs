@@ -212,6 +212,23 @@ impl Context {
     }
 
 
+    /// Create an unconnected PulseAudioStream from this server.
+    /// Args:
+    ///    name: a name for this stream
+    ///    ss: the sample format of the stream
+    ///    map: the desired channel
+    pub fn create_stream(&self, name: &str, ss: &pa_sample_spec, map: Option<&pa_channel_map>) -> PulseAudioStream {
+        let internal_guard = self.internal.lock();
+        let mut internal = internal_guard.unwrap();
+        let sample_spec_ptr: *const pa_sample_spec =
+            ss as *const pa_sample_spec;
+        let channel_map_ptr: *const pa_channel_map = match map {
+            Some(map) => map as *const pa_channel_map,
+            None => ptr::null()
+        };
+        PulseAudioStream::new(
+            internal.ptr, name, sample_spec_ptr, channel_map_ptr)
+    }
 }
 
 
@@ -513,20 +530,48 @@ pub fn pa_context_set_subscribe_callback(c: *mut pa_context, cb: pa_context_subs
 
 
 
-pub fn pa_stream_new(c: *mut opaque::pa_context, name: &str, ss: *const pa_sample_spec, map: *const pa_channel_map) -> *mut opaque::pa_stream {
+fn pa_stream_new(c: *mut opaque::pa_context, name: &str, ss: *const pa_sample_spec, map: *const pa_channel_map) -> *mut opaque::pa_stream {
     assert!(!c.is_null());
     let name = CString::from_slice(name.as_bytes());
     return unsafe { ext::stream::pa_stream_new(c, name.as_ptr(), ss, map) };
 }
 
 
-pub fn pa_stream_peek (
+fn pa_stream_peek (
     stream: *mut opaque::pa_stream, data: *const *mut c_void,
     nbytes: *mut size_t) -> c_int {
     assert!(!stream.is_null());
     assert!(!data.is_null());
     assert!(!nbytes.is_null());
     return unsafe { ext::stream::pa_stream_peek(stream, data, nbytes) };
+}
+
+
+fn pa_stream_connect_record(
+    stream: &mut opaque::pa_stream,
+    source_name: Option<&str>,
+    buffer_attributes: Option<&pa_buffer_attr>,
+    stream_flags: Option<pa_stream_flags_t>) -> Result<c_int, String> {
+
+    let dev: *const c_char = match source_name {
+        None => ptr::null(),
+        Some(name) => CString::from_slice(name.as_bytes()).as_ptr()
+    };
+
+    let attr: *const pa_buffer_attr = match buffer_attributes {
+        None => ptr::null(),
+        Some(attributes) => attributes as *const pa_buffer_attr
+    };
+
+    let flags: pa_stream_flags_t = match stream_flags {
+        None => pa_stream_flags_t::PA_STREAM_NOFLAGS,
+        Some(stream_flags) => stream_flags
+    };
+
+    unsafe {
+        Ok(ext::stream::pa_stream_connect_record(
+            &mut pa_stream as *mut opaque::pa_stream, dev, attr, flags))
+    }
 }
 
 
@@ -707,14 +752,25 @@ mod ext {
 
             pub fn pa_stream_disconnect(s: *mut pa_stream);
 
+            /// Sets data to a pointer to readable data, and nbytes to the
+            /// amount of data available. If data is null and nbytes is 0,
+            /// there is no data to read. If data is null and nbytes is >0,
+            /// there is a hole in the stream's buffer.
             pub fn pa_stream_peek(
                 p: *mut pa_stream,
                 data: *const *mut c_void,
                 nbytes: *mut size_t
             ) -> c_int;
 
+            /// Drops the data in the stream's current buffer.
             pub fn pa_stream_drop(p: *mut pa_stream) -> c_int;
 
+            /// Connects a stream to a source.
+            pub fn pa_stream_connect_record(
+                s: *mut pa_stream,
+                dev: *const c_char,
+                attr: *const pa_buffer_attr,
+                flags: pa_stream_flags_t) -> c_int;
         }
     }
 }
