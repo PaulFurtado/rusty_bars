@@ -4,11 +4,13 @@
 
 extern crate libc;
 use libc::funcs::c95::string::strlen;
-use self::libc::{c_int, c_char, c_void};
+use self::libc::{c_int, c_char, c_void, size_t};
 use std::ffi::CString;
 pub use pulse_types::*;
 use std::ptr;
 use std::mem;
+use std::fmt;
+use std::slice;
 use std::sync::{Arc, Mutex};
 use std::io::{Reader, Writer, IoResult, IoError, IoErrorKind};
 
@@ -380,15 +382,86 @@ pub fn pa_context_get_sink_info_by_name(c: *mut pa_context, name: &str, cb: pa_s
 }
 
 
-struct PulseAudioStream {
+pub fn pa_stream_new(c: *mut opaque::pa_context, name: &str, ss: *const pa_sample_spec, map: *const pa_channel_map) -> *mut opaque::pa_stream {
+    assert!(!c.is_null());
+    let name = CString::from_slice(name.as_bytes());
+    return unsafe { ext::stream::pa_stream_new(c, name.as_ptr(), ss, map) };
+}
+
+
+pub fn pa_stream_peek (
+    stream: *mut opaque::pa_stream, data: *const *mut c_void,
+    nbytes: *mut size_t) -> c_int {
+    assert!(!stream.is_null());
+    assert!(!data.is_null());
+    assert!(!nbytes.is_null());
+    return unsafe { ext::stream::pa_stream_peek(stream, data, nbytes) };
+}
+
+pub struct PulseAudioStream {
     pa_stream: *mut opaque::pa_stream
 }
 
 impl PulseAudioStream {
+    pub fn new(context: *mut pa_context, name: &str, ss: *const pa_sample_spec,
+        map: *const pa_channel_map) -> Self {
+        PulseAudioStream {
+            pa_stream: pa_stream_new(context, name, ss, map)
+        }
+    }
+
+    /// Reads data into
+    pub fn peek(&mut self) -> IoResult<Vec<u8>> {
+        let mut buf: *mut u8 = ptr::null_mut();
+        let mut nbytes: size_t = 0;
+
+        let mut ret: c_int = 0;
+        unsafe {
+            ret = pa_stream_peek(self.pa_stream, &(buf as *mut c_void), &mut nbytes);
+        };
+
+        if (buf.is_null()) {
+            if (nbytes == 0) {
+                return Err(IoError {
+                    kind: IoErrorKind::NoProgress,
+                    desc: "Buffer is empty",
+                    detail: None
+                });
+            } else {
+                return Err(IoError {
+                    kind: IoErrorKind::OtherIoError,
+                    desc: "Hole in input buffer",
+                    detail: Some(fmt::format(format_args!("hole of size {}", nbytes))),
+                });
+            }
+        }
+
+        unsafe {
+            let data: Vec<u8> = Vec::from_raw_buf(buf, nbytes as usize);
+            return Ok(data);
+        }
+    }
 }
 
+/*
 impl Reader for PulseAudioStream {
     fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
+        let mut err: c_int = 0;
+        let mut ptr: *mut u8 = buf.as_mut_ptr();
+        let mut amount_read:
+
+        // Peek
+        unsafe {
+            err = ext::stream::pa_stream_peek(
+                self.pa_stream, &mut ptr(), buf.len() as size_t);
+        }
+
+        if
+
+        // Copy
+        {
+            let data = slice::from_raw_buf(&ptr, buf.len() as size_t);
+        }
         return Err(IoError {
             kind: IoErrorKind::OtherIoError,
             desc: "Not implemented",
@@ -407,6 +480,7 @@ impl Writer for PulseAudioStream {
     }
 
 }
+*/
 
 impl Drop for PulseAudioStream {
     fn drop(&mut self) {
@@ -492,11 +566,18 @@ mod ext {
 
     pub mod stream {
         extern crate libc;
-        use self::libc::{c_void, c_char, c_int};
+        use self::libc::{c_void, c_char, c_int, size_t};
         use pulse_types::*;
 
         #[link(name="pulse")]
         extern {
+            pub fn pa_stream_new(
+                c: *mut opaque::pa_context,
+                name: *const c_char,
+                ss: *const pa_sample_spec,
+                map: *const pa_channel_map
+           ) -> *mut opaque::pa_stream;
+
             pub fn pa_stream_new_extended(
                 c: *mut opaque::pa_context,
                 name: *const c_char,
@@ -511,6 +592,15 @@ mod ext {
                 userdata: *mut c_void);
 
             pub fn pa_stream_disconnect(s: *mut pa_stream);
+
+            pub fn pa_stream_peek(
+                p: *mut pa_stream,
+                data: *const *mut c_void,
+                nbytes: *mut size_t
+            ) -> c_int;
+
+            pub fn pa_stream_drop(p: *mut pa_stream) -> c_int;
+
         }
     }
 }
