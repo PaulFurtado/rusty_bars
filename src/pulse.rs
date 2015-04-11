@@ -542,8 +542,8 @@ impl<'a> PulseAudioStream<'a> {
         }
     }
 
-
-    /// Reads data into
+    /// Returns data available for reading.
+    /// Copies the data returned.
     pub fn peek(&'a mut self) -> IoResult<&'a [u8]> {
         let mut buf: *mut u8 = ptr::null_mut();
         let mut nbytes: size_t = 0;
@@ -570,6 +570,7 @@ impl<'a> PulseAudioStream<'a> {
         }
 
         unsafe {
+            self._last_ptr = buf as *const u8;
             Ok(slice::from_raw_buf(&self._last_ptr, nbytes as usize))
         }
     }
