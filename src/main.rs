@@ -245,12 +245,24 @@ fn main() {
                     println!("default_sink_name: {}", info.get_default_sink_name());
                     println!("default_source_name: {}", info.get_default_source_name());
                     println!("===================== end server_info_callback =======================");
+                    println!("\n\n");
+                    context.get_sink_info_by_name(info.get_default_sink_name(), move |context, info| {
+                        match info {
+                            Some(info) => {
+                                println!("===================== sink_info_callback =======================");
+                                println!("name: {}", info.get_name());
+                                println!("description: {}", info.get_description());
+                                println!("monitor_source: {}", info.get_monitor_source_name());
+                                println!("driver: {}", info.get_driver());
+                                println!("===================== end sink_info_callback =======================");
+                            },
+                            None => {}
+                        }
+                    });
                 });
-
             },
             _ => {}
         }
-
     });
     context.connect(None, pa_context_flags::NOAUTOSPAWN);
     mainloop.run();
