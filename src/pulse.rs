@@ -17,7 +17,7 @@ use std::io::{Reader, Writer, IoResult, IoError, IoErrorKind};
 type StateCallback = Fn(Context, pa_context_state) + Send;
 type ServerInfoCallback = Fn(Context, &pa_server_info) + Send;
 type SinkInfoCallback = Fn(Context, Option<&pa_sink_info>) + Send;
-type SubscriptionCallback = Fn(Context, pa_subscription_mask, pa_subscription_event_type) + Send;
+type SubscriptionCallback = Fn(Context, pa_subscription_event_type, u32) + Send;
 type PaContextSuccessCallback = Fn(Context, bool) + Send;
 
 
@@ -27,7 +27,6 @@ type BoxedServerInfoCallback = Box<ServerInfoCallback>;
 type BoxedSinkInfoCallback = Box<SinkInfoCallback>;
 type BoxedSubscriptionCallback = Box<SubscriptionCallback>;
 type BoxedPaContextSuccessCallback = Box<PaContextSuccessCallback>;
-
 
 
 
@@ -182,18 +181,20 @@ impl Context {
     }
 
     /// Adds an event subscription
-    pub fn add_subscription(&self, mask: pa_subscription_mask) {
+    pub fn add_subscription<C>(&self, mask: pa_subscription_mask, cb: C) where C: Fn(Context, bool), C: Send {
         let internal_guard = self.internal.lock();
         let mut internal = internal_guard.unwrap();
+        internal.context_success_cb = Some(Box::new(cb) as BoxedPaContextSuccessCallback);
         internal.subscriptions.add(mask);
         let new_mask = internal.subscriptions.get_mask();
         pa_context_subscribe(internal.ptr, new_mask, _subscription_success_callback, internal.as_void_ptr());
     }
 
     /// Removes an event subscription
-    pub fn remove_subscription(&self, mask: pa_subscription_mask) {
+    pub fn remove_subscription<C>(&self, mask: pa_subscription_mask, cb: C) where C: Fn(Context, bool), C: Send {
         let internal_guard = self.internal.lock();
         let mut internal = internal_guard.unwrap();
+        internal.context_success_cb = Some(Box::new(cb) as BoxedPaContextSuccessCallback);
         internal.subscriptions.remove(mask);
         let new_mask = internal.subscriptions.get_mask();
         pa_context_subscribe(internal.ptr, new_mask, _subscription_success_callback, internal.as_void_ptr());
@@ -223,6 +224,10 @@ struct ContextInternal {
     /// Callback closure for getting sink info.  Called once for for each
     /// element in the list of sinks
     sink_info_cb: Option<BoxedSinkInfoCallback>,
+    /// Called for events
+    event_cb: Option<BoxedSubscriptionCallback>,
+    /// Called for event subscription events
+    context_success_cb: Option<BoxedPaContextSuccessCallback>,
     /// Manages subscriptions to events
     subscriptions: SubscriptionManager,
 }
@@ -247,6 +252,8 @@ impl ContextInternal {
             state_cb: None,
             server_info_cb: None,
             sink_info_cb: None,
+            event_cb: None,
+            context_success_cb: None,
             subscriptions: SubscriptionManager::new()
         }
     }
@@ -300,11 +307,19 @@ impl ContextInternal {
     }
 
     fn event_callback(&self, t: pa_subscription_event_type, idx: u32) {
-        println!("called back for event: {}, idx: {}", t as c_int, idx);
+        let external = self.external.clone().unwrap();
+        match self.event_cb {
+            Some(ref cb) => cb(external, t, idx),
+            None => println!("warning: no event callback is set")
+        }
     }
 
     fn subscription_success_callback(&self, success: bool) {
-        println!("subscribed: {}", success);
+        let external = self.external.clone().unwrap();
+        match self.context_success_cb {
+            Some(ref cb) => cb(external, success),
+            None => println!("warning: no success callback is set"),
+        }
     }
 
 }

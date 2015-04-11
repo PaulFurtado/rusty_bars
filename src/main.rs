@@ -266,7 +266,11 @@ fn main() {
                                 println!("===================== end sink_info_callback =======================");
 
                                 context.set_event_callback();
-                                context.add_subscription(pa_subscription_mask::SERVER);
+                                context.add_subscription(pa_subscription_mask::SERVER, move |context, success| {
+                                    if !success {
+                                        println!("failed to subscribe to event!");
+                                    }
+                                });
                             },
                             None => {}
                         }
