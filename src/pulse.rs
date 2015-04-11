@@ -528,15 +528,19 @@ pub fn pa_stream_peek (
     return unsafe { ext::stream::pa_stream_peek(stream, data, nbytes) };
 }
 
-pub struct PulseAudioStream {
-    pa_stream: *mut opaque::pa_stream
+
+pub struct PulseAudioStream<'a> {
+    pa_stream: *mut opaque::pa_stream,
+    _last_ptr: *const u8
 }
 
-impl<'a> PulseAudioStream {
+
+impl<'a> PulseAudioStream<'a> {
     pub fn new(context: *mut pa_context, name: &str, ss: *const pa_sample_spec,
         map: *const pa_channel_map) -> Self {
         PulseAudioStream {
-            pa_stream: pa_stream_new(context, name, ss, map)
+            pa_stream: pa_stream_new(context, name, ss, map),
+            _last_ptr: ptr::null(),
         }
     }
 
@@ -566,27 +570,20 @@ impl<'a> PulseAudioStream {
             }
         }
 
-        let mut data: &[u8];
         unsafe {
-            data = slice::from_raw_buf(&(buf as *const u8), nbytes as usize);
+            self._last_ptr = buf as *const u8;
+            Ok(slice::from_raw_buf(&self._last_ptr, nbytes as usize))
         }
-        return Ok(data);
-    }
-
-
-    /// Remove the current fragment on Pulse's record streams.
-    pub fn drop_fragment(&mut self) -> IoResult<()> {
-        unsafe { ext::stream::pa_stream_drop(self.pa_stream) };
-        Ok(())
     }
 }
 
 
 impl Drop for PulseAudioStream {
+    /// Disconnects the PulseAudioStream when dropped.
     fn drop(&mut self) {
-       assert!(!self.pa_stream.is_null());
-       println!("[PulseAudioStream] dropped. Disconnecting from pa_stream");
-       unsafe { ext::stream::pa_stream_disconnect(self.pa_stream) };
+        assert!(!self.pa_stream.is_null());
+        println!("[PulseAudioStream] dropped. Disconnecting from pa_stream");
+        unsafe { ext::stream::pa_stream_disconnect(self.pa_stream) };
     }
 }
 
