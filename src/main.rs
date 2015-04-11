@@ -1,4 +1,5 @@
 #![allow(unstable)]
+#![feature(unsafe_destructor)]
 
 // TODO: Automatically get default sink
 
