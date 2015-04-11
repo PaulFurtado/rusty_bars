@@ -16,10 +16,12 @@ use std::io::{Reader, Writer, IoResult, IoError, IoErrorKind};
 // Types for callback closures
 type StateCallback = Fn(Context, pa_context_state) + Send;
 type ServerInfoCallback = Fn(Context, &pa_server_info) + Send;
+type SinkInfoCallback = Fn(Context, Option<&pa_sink_info>) + Send;
 
 // Boxed types for callback closures
 type BoxedStateCallback = Box<StateCallback>;
 type BoxedServerInfoCallback = Box<ServerInfoCallback>;
+type BoxedSinkInfoCallback = Box<SinkInfoCallback>;
 
 
 /// Coverts a pulse error code to a String
@@ -144,7 +146,7 @@ impl Context {
     /// 2. After setting a state callback, run this method
     /// 3. Directly after running this method, start the mainloop to start
     ///    getting callbacks.
-    pub fn connect(&mut self, server: Option<&str>, flags: pa_context_flags) {
+    pub fn connect(&self, server: Option<&str>, flags: pa_context_flags) {
         let internal_guard = self.internal.lock();
         let internal = internal_guard.unwrap();
         pa_context_connect(internal.ptr, server, flags, None);
@@ -152,11 +154,18 @@ impl Context {
 
     /// Gets basic information about the server. See the pa_server_info struct
     /// for more details.
-    pub fn get_server_info<C>(&mut self, cb: C) where C: Fn(Context, &pa_server_info), C: Send {
+    pub fn get_server_info<C>(&self, cb: C) where C: Fn(Context, &pa_server_info), C: Send {
         let internal_guard = self.internal.lock();
         let mut internal = internal_guard.unwrap();
         internal.server_info_cb = Some(Box::new(cb) as BoxedServerInfoCallback);
         pa_context_get_server_info(internal.ptr, _server_info_callback, internal.as_void_ptr());
+    }
+
+    pub fn get_sink_info_by_name<C>(&self, name: &str, cb: C) where C: Fn(Context, Option<&pa_sink_info>), C: Send {
+        let internal_guard = self.internal.lock();
+        let mut internal = internal_guard.unwrap();
+        internal.sink_info_cb = Some(Box::new(cb) as BoxedSinkInfoCallback);
+        pa_context_get_sink_info_by_name(internal.ptr, name, _sink_info_callback, internal.as_void_ptr());
     }
 }
 
@@ -171,6 +180,9 @@ struct ContextInternal {
     /// Callback closure for get_server_info. Called once per execution of
     /// get_server_info.
     server_info_cb: Option<BoxedServerInfoCallback>,
+    /// Callback closure for getting sink info.  Called once for for each
+    /// element in the list of sinks
+    sink_info_cb: Option<BoxedSinkInfoCallback>
 }
 
 
@@ -192,6 +204,7 @@ impl ContextInternal {
             external: None,
             state_cb: None,
             server_info_cb: None,
+            sink_info_cb: None,
         }
     }
 
@@ -234,9 +247,20 @@ impl ContextInternal {
             None => println!("warning: no server info callback is set"),
         }
     }
+
+    /// Called back for the sink_info_list and get_sink_info commands
+    fn sink_info_callback(&self, info: Option<&pa_sink_info>) {
+        let external = self.external.clone().unwrap();
+        match self.sink_info_cb {
+            Some(ref cb) => cb(external, info),
+            None => println!("warning: no sink info callback is set"),
+        }
+    }
+
 }
 
 /// Utility to convert C strings to String objects
+/// TODO: standard library
 pub fn cstr_to_string(c_str: *const c_char) -> String {
     let len: usize = unsafe{ strlen(c_str) } as usize;
     let s = unsafe{ String::from_raw_parts(c_str as *mut u8, len, len) };
@@ -259,6 +283,24 @@ extern fn _server_info_callback(_: *mut pa_context, info: *const pa_server_info,
     context_internal.server_info_callback(unsafe{ &*info });
 }
 
+
+extern fn _sink_info_callback(_: *mut pa_context, info: *const pa_sink_info, eol: c_int, context: *mut c_void) {
+    let context_internal = unsafe{ &* (context as *mut ContextInternal) };
+    if eol == 1 || info.is_null() {
+        context_internal.sink_info_callback(None);
+    } else {
+        context_internal.sink_info_callback(Some(unsafe{ &*info }));
+    }
+
+}
+
+
+/// A safe interface to pa_context_set_state_callback
+pub fn pa_context_set_state_callback(context: *mut opaque::pa_context,
+    cb: cb::pa_context_notify_cb_t, userdata: *mut c_void) {
+    assert!(!context.is_null());
+    unsafe { ext::pa_context_set_state_callback(context, cb, userdata) };
+}
 
 /// A rust wrapper around pa_context_disconnect.
 /// Immediately/synchronously disconnect from the PulseAudio server.
@@ -330,12 +372,11 @@ pub fn pa_mainloop_new() -> *mut opaque::pa_mainloop {
     return mainloop;
 }
 
-
-/// A safe interface to pa_context_set_state_callback
-pub fn pa_context_set_state_callback(context: *mut opaque::pa_context,
-    cb: cb::pa_context_notify_cb_t, userdata: *mut c_void) {
-    assert!(!context.is_null());
-    unsafe { ext::pa_context_set_state_callback(context, cb, userdata) };
+/// Gets sink info by the sink's name
+pub fn pa_context_get_sink_info_by_name(c: *mut pa_context, name: &str, cb: pa_sink_info_cb_t, userdata: *mut c_void) {
+    assert!(!c.is_null());
+    let name = CString::from_slice(name.as_bytes());
+    unsafe{ ext::pa_context_get_sink_info_by_name(c, name.as_ptr(), cb, userdata) };
 }
 
 
@@ -400,6 +441,13 @@ mod ext {
             cb: cb::pa_context_notify_cb_t,
             userdata: *mut c_void
         );
+
+        pub fn pa_context_get_sink_info_by_name(
+            c: *mut pa_context,
+            name: *const c_char,
+            cb: pa_sink_info_cb_t,
+            userdata: *mut c_void
+        ) -> *mut pa_operation;
 
         pub fn pa_context_connect(
             context: *mut opaque::pa_context,

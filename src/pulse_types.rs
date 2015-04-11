@@ -3,6 +3,7 @@
 #![allow(dead_code)]
 #![allow(raw_pointer_derive)]
 
+
 pub use self::cb::*;
 pub use self::opaque::*;
 pub use self::enums::*;
@@ -178,9 +179,8 @@ pub mod enums {
         PA_SINK_HW_MUTE_CTRL = 0x0010is,
         PA_SINK_DECIBEL_VOLUME = 0x0020is,
         PA_SINK_FLAT_VOLUME = 0x0040is,
-        PA_SINK_DYNAMIC_LATENCY = 0x0080is
+        PA_SINK_DYNAMIC_LATENCY = 0x0080is,
     }
-
 
     #[repr(C)]
     #[derive(Copy)]
@@ -195,11 +195,51 @@ pub mod enums {
         PA_ENCODING_MAX,
         PA_ENCODING_INVALID = -1,
     }
+
+    #[repr(C)]
+    #[derive(Copy)]
+    pub enum pa_subscription_event_type {
+        SINK = 0x0000,
+        SOURCE = 0x0001,
+        SINK_INPUT = 0x0002,
+        SOURCE_OUTPUT = 0x0003,
+        MODULE = 0x0004,
+        CLIENT = 0x0005,
+        SAMPLE_CACHE = 0x0006,
+        SERVER = 0x0007,
+        AUTOLOAD = 0x0008,
+        CARD = 0x0009,
+        FACILITY_MASK = 0x000F,
+        //XXX: Sigh. PulseAudio uses 0 in this enum multiple times. Rust doesn't
+        //XXX: support this.
+        //NEW = 0x0000,
+        CHANGE = 0x0010,
+        REMOVE = 0x0020,
+        TYPE_MASK = 0x0030,
+    }
+
+    #[repr(C)]
+    #[derive(Copy)]
+    pub enum pa_subscription_mask {
+        NULL = 0x0000,
+        SINK = 0x0001,
+        SOURCE = 0x0002,
+        SINK_INPUT = 0x0004,
+        SOURCE_OUTPUT = 0x0008,
+        MODULE = 0x0010,
+        CLIENT = 0x0020,
+        SAMPLE_CACHE = 0x0040,
+        SERVER = 0x0080,
+        AUTOLOAD = 0x0100,
+        CARD = 0x0200,
+    }
+
 }
 
 pub mod structs {
     extern crate libc;
-    use self::libc::{c_int, c_char, c_void};
+    use self::libc::{c_int, c_char, c_void, strlen};
+    use std::{str, slice, mem};
     use super::types::*;
     use super::enums::*;
     use super::opaque::*;
@@ -228,7 +268,7 @@ pub mod structs {
 
     #[repr(C)]
     #[derive(Copy)]
-    pub struct pa_sink_info {
+    pub struct pa_sink_info<'a> {
         pub name: *const c_char,               //**< Name of the sink */
         pub index: u32,                        //**< Index of the sink */
         pub description: *const c_char,  //**< Description of this sink */
@@ -260,7 +300,7 @@ pub mod structs {
 
     #[repr(C)]
     #[derive(Copy)]
-    pub struct pa_server_info {
+    pub struct pa_server_info<'a> {
         pub user_name: *const c_char,
         pub host_name: *const c_char,
         pub server_version: *const c_char,
@@ -277,6 +317,58 @@ pub mod structs {
     pub struct pa_format_info {
         pub encoding: pa_encoding_t,
         pub plist: *mut pa_proplist
+    }
+
+    /// Impl for making it easy to get string values from pa_server_info
+    impl<'a> pa_server_info<'a> {
+        pub fn get_user_name(&'a self) -> &'a str {
+            get_str(&self.user_name)
+        }
+
+        pub fn get_host_name(&'a self) -> &'a str {
+            get_str(&self.host_name)
+        }
+
+        pub fn get_server_version(&'a self) -> &'a str {
+            get_str(&self.server_version)
+        }
+
+        pub fn get_server_name(&'a self) -> &'a str {
+            get_str(&self.server_name)
+        }
+
+        pub fn get_default_sink_name(&'a self) -> &'a str {
+            get_str(&self.default_sink_name)
+        }
+
+        pub fn get_default_source_name(&'a self) -> &'a str {
+            get_str(&self.default_source_name)
+        }
+    }
+
+    impl<'a> pa_sink_info<'a> {
+        pub fn get_name(&'a self) -> &'a str {
+            get_str(&self.name)
+        }
+
+        pub fn get_description(&'a self) -> &'a str {
+            get_str(&self.description)
+        }
+
+        pub fn get_monitor_source_name(&'a self) -> &'a str {
+            get_str(&self.monitor_source_name)
+        }
+
+        pub fn get_driver(&'a self) -> &'a str {
+            get_str(&self.driver)
+        }
+    }
+
+    /// Turn a raw c pointer with a life time into an &str
+    fn get_str<'a>(c_buf: &'a *const c_char) -> &'a str {
+        let len = unsafe{ strlen(*c_buf) } as usize;
+        let slice: &[c_char] = unsafe{ slice::from_raw_buf(c_buf, len) };
+        str::from_utf8(unsafe{ mem::transmute(slice) }).unwrap()
     }
 
 }

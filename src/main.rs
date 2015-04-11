@@ -246,19 +246,32 @@ fn main() {
                 println!("calling!");
                 context.get_server_info(move |context, info| {
                     println!("===================== server_info_callback =======================");
-                    println!("user_name: {}", cstr_to_string(info.user_name));
-                    println!("host_name: {}", cstr_to_string(info.host_name));
-                    println!("server_version: {}", cstr_to_string(info.server_version));
-                    println!("server_name: {}", cstr_to_string(info.server_name));
-                    println!("default_sink_name: {}", cstr_to_string(info.default_sink_name));
-                    println!("default_source_name: {}", cstr_to_string(info.default_source_name));
+                    println!("user_name: {}", info.get_user_name());
+                    println!("host_name: {}", info.get_host_name());
+                    println!("server_version: {}", info.get_server_version());
+                    println!("server_name: {}", info.get_server_name());
+                    println!("default_sink_name: {}", info.get_default_sink_name());
+                    println!("default_source_name: {}", info.get_default_source_name());
                     println!("===================== end server_info_callback =======================");
+                    println!("\n\n");
+                    context.get_sink_info_by_name(info.get_default_sink_name(), move |context, info| {
+                        match info {
+                            Some(info) => {
+                                println!("===================== sink_info_callback =======================");
+                                println!("name: {}", info.get_name());
+                                println!("description: {}", info.get_description());
+                                println!("monitor_source: {}", info.get_monitor_source_name());
+                                println!("monitor_source index: {}", info.monitor_source);
+                                println!("driver: {}", info.get_driver());
+                                println!("===================== end sink_info_callback =======================");
+                            },
+                            None => {}
+                        }
+                    });
                 });
-
             },
             _ => {}
         }
-
     });
     context.connect(None, pa_context_flags::NOAUTOSPAWN);
     mainloop.run();
