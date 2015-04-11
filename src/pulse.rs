@@ -528,20 +528,23 @@ pub fn pa_stream_peek (
     return unsafe { ext::stream::pa_stream_peek(stream, data, nbytes) };
 }
 
-pub struct PulseAudioStream {
-    pa_stream: *mut opaque::pa_stream
+pub struct PulseAudioStream<'a> {
+    pa_stream: *mut opaque::pa_stream,
+    _last_ptr: *const u8
 }
 
-impl PulseAudioStream {
+impl<'a> PulseAudioStream<'a> {
     pub fn new(context: *mut pa_context, name: &str, ss: *const pa_sample_spec,
         map: *const pa_channel_map) -> Self {
         PulseAudioStream {
-            pa_stream: pa_stream_new(context, name, ss, map)
+            pa_stream: pa_stream_new(context, name, ss, map),
+            _last_ptr: ptr::null(),
         }
     }
 
+
     /// Reads data into
-    pub fn peek(&mut self) -> IoResult<Vec<u8>> {
+    pub fn peek(&'a mut self) -> IoResult<&'a [u8]> {
         let mut buf: *mut u8 = ptr::null_mut();
         let mut nbytes: size_t = 0;
 
@@ -567,8 +570,7 @@ impl PulseAudioStream {
         }
 
         unsafe {
-            let data: Vec<u8> = Vec::from_raw_buf(buf, nbytes as usize);
-            return Ok(data);
+            Ok(slice::from_raw_buf(&self._last_ptr, nbytes as usize))
         }
     }
 }
@@ -611,14 +613,14 @@ impl Writer for PulseAudioStream {
 
 }
 */
-
+/*
 impl Drop for PulseAudioStream {
     fn drop(&mut self) {
        assert!(!self.pa_stream.is_null());
        println!("[PulseAudioStream] dropped. Disconnecting from pa_stream");
        unsafe { ext::stream::pa_stream_disconnect(self.pa_stream) };
     }
-}
+}*/
 
 mod ext {
     extern crate libc;
