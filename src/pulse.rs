@@ -575,44 +575,6 @@ impl<'a> PulseAudioStream {
     }
 }
 
-/*
-impl Reader for PulseAudioStream {
-    fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
-        let mut err: c_int = 0;
-        let mut ptr: *mut u8 = buf.as_mut_ptr();
-        let mut amount_read:
-
-        // Peek
-        unsafe {
-            err = ext::stream::pa_stream_peek(
-                self.pa_stream, &mut ptr(), buf.len() as size_t);
-        }
-
-        if
-
-        // Copy
-        {
-            let data = slice::from_raw_buf(&ptr, buf.len() as size_t);
-        }
-        return Err(IoError {
-            kind: IoErrorKind::OtherIoError,
-            desc: "Not implemented",
-            detail: None
-        });
-    }
-}
-
-impl Writer for PulseAudioStream {
-    fn write(&mut self, buf: &[u8]) -> IoResult<()> {
-        return Err(IoError {
-            kind: IoErrorKind::OtherIoError,
-            desc: "Not implemented",
-            detail: None
-        });
-    }
-
-}
-*/
 
 impl Drop for PulseAudioStream {
     fn drop(&mut self) {
@@ -621,6 +583,7 @@ impl Drop for PulseAudioStream {
        unsafe { ext::stream::pa_stream_disconnect(self.pa_stream) };
     }
 }
+
 
 mod ext {
     extern crate libc;
