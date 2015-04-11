@@ -305,10 +305,3 @@ fn main() {
 
     run_analyzer(args[1].as_slice());
 }
-
-// USEFUL DOCS:
-//
-// Stereo vs mono:
-// http://stackoverflow.com/questions/3287911/how-to-represent-stereo-audio-data-for-fft
-// http://stackoverflow.com/questions/14477454/apply-fft-to-a-both-channels-of-a-stereo-signal-seperately
-// http://stackoverflow.com/questions/4714542/pcm-wave-file-stereo-to-mono
