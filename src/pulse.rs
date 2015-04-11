@@ -10,6 +10,7 @@ pub use pulse_types::*;
 use std::ptr;
 use std::mem;
 use std::sync::{Arc, Mutex};
+use std::io::{Reader, Writer, IoResult, IoError, IoErrorKind};
 
 
 // Types for callback closures
@@ -337,6 +338,43 @@ pub fn pa_context_set_state_callback(context: *mut opaque::pa_context,
     unsafe { ext::pa_context_set_state_callback(context, cb, userdata) };
 }
 
+
+struct PulseAudioStream {
+    pa_stream: *mut opaque::pa_stream
+}
+
+impl PulseAudioStream {
+}
+
+impl Reader for PulseAudioStream {
+    fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
+        return Err(IoError {
+            kind: IoErrorKind::OtherIoError,
+            desc: "Not implemented",
+            detail: None
+        });
+    }
+}
+
+impl Writer for PulseAudioStream {
+    fn write(&mut self, buf: &[u8]) -> IoResult<()> {
+        return Err(IoError {
+            kind: IoErrorKind::OtherIoError,
+            desc: "Not implemented",
+            detail: None
+        });
+    }
+
+}
+
+impl Drop for PulseAudioStream {
+    fn drop(&mut self) {
+       assert!(!self.pa_stream.is_null());
+       println!("[PulseAudioStream] dropped. Disconnecting from pa_stream");
+       unsafe { ext::stream::pa_stream_disconnect(self.pa_stream) };
+    }
+}
+
 mod ext {
     extern crate libc;
     use self::libc::{c_void, c_char, c_int};
@@ -401,19 +439,30 @@ mod ext {
             cb: cb::pa_server_info_cb_t,
             userdata: *mut c_void
         ) -> *mut opaque::pa_operation;
+    }
 
-        pub fn pa_stream_new_extended(
-            c: *mut opaque::pa_context,
-            name: *const c_char,
-            formats: *const *const pa_format_info,
-            n_formats: c_int,
-            p: *mut pa_proplist
-        ) -> *mut opaque::pa_stream;
 
-        pub fn pa_stream_set_read_callback(
-            p: *mut opaque::pa_stream,
-            cb: pa_stream_request_cb_t,
-            userdata: *mut c_void
-        );
+    pub mod stream {
+        extern crate libc;
+        use self::libc::{c_void, c_char, c_int};
+        use pulse_types::*;
+
+        #[link(name="pulse")]
+        extern {
+            pub fn pa_stream_new_extended(
+                c: *mut opaque::pa_context,
+                name: *const c_char,
+                formats: *const *const pa_format_info,
+                n_formats: c_int,
+                p: *mut pa_proplist
+            ) -> *mut opaque::pa_stream;
+
+            pub fn pa_stream_set_read_callback(
+                p: *mut opaque::pa_stream,
+                cb: pa_stream_request_cb_t,
+                userdata: *mut c_void);
+
+            pub fn pa_stream_disconnect(s: *mut pa_stream);
+        }
     }
 }
