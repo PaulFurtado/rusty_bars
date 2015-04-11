@@ -289,7 +289,7 @@ extern fn _server_info_callback(_: *mut pa_context, info: *const pa_server_info,
     context_internal.server_info_callback(unsafe{ &*info });
 }
 
-
+/// Sink info callback for C to call.
 extern fn _sink_info_callback(_: *mut pa_context, info: *const pa_sink_info, eol: c_int, context: *mut c_void) {
     let context_internal = unsafe{ &* (context as *mut ContextInternal) };
     if eol == 1 || info.is_null() {
@@ -297,9 +297,7 @@ extern fn _sink_info_callback(_: *mut pa_context, info: *const pa_sink_info, eol
     } else {
         context_internal.sink_info_callback(Some(unsafe{ &*info }));
     }
-
 }
-
 
 /// A safe interface to pa_context_set_state_callback
 pub fn pa_context_set_state_callback(context: *mut opaque::pa_context,
@@ -493,6 +491,19 @@ mod ext {
             cb: cb::pa_server_info_cb_t,
             userdata: *mut c_void
         ) -> *mut opaque::pa_operation;
+
+        pub fn pa_context_subscribe(
+            c: *mut opaque::pa_context,
+            m: pa_subscription_mask,
+            cb: pa_context_success_cb_t,
+            userdata: *mut c_void
+        ) -> *mut opaque::pa_operation;
+
+        pub fn pa_context_set_subscribe_callback(
+            c: *mut opaque::pa_context,
+            cb: pa_context_subscribe_cb_t,
+            userdata: *mut c_void
+        );
     }
 
 

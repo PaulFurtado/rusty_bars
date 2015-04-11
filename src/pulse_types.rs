@@ -17,6 +17,7 @@ pub mod cb {
     use self::libc::{c_int, c_void};
     use super::opaque::*;
     use super::structs::*;
+    use super::enums::*;
 
     pub type pa_context_notify_cb_t = extern "C" fn(
         *mut pa_context,
@@ -41,13 +42,23 @@ pub mod cb {
         nbytes: c_int,
         *mut c_void
     );
-}
 
+    pub type pa_context_subscribe_cb_t = extern "C" fn(
+        p: *mut pa_context,
+        t: pa_subscription_event_type,
+        idx: u32,
+        userdata: *mut c_void
+    );
+
+    pub type pa_context_success_cb_t = extern "C" fn(
+        c: *mut pa_context,
+        success: c_int,
+        userdata: *mut c_void,
+    );
+}
 
 /// For types we only have pointers to. Use structs with names so there is at
 /// least pointer type safety.
-/// NOTE: Don't #[derive(Copy)] for these, to enforce that it gives an error
-///       if an attempt is made to dereference one of these.
 pub mod opaque {
     #[repr(C)]
     pub struct pa_mainloop;
