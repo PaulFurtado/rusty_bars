@@ -161,6 +161,12 @@ impl Context {
         pa_context_get_server_info(internal.ptr, _server_info_callback, internal.as_void_ptr());
     }
 
+    /// Get information about a sink using its name.
+    //  PulseAudio uses the same callback type for getting a single sink as
+    /// getting the list of all sinks, so a single sink works like a single
+    /// element list. You should get two callbacks from this function: one with
+    /// the information about the sink, and one with None indicating the end of
+    /// the list.
     pub fn get_sink_info_by_name<C>(&self, name: &str, cb: C) where C: Fn(Context, Option<&pa_sink_info>), C: Send {
         let internal_guard = self.internal.lock();
         let mut internal = internal_guard.unwrap();
