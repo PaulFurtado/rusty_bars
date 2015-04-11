@@ -1,3 +1,4 @@
+#![feature(unsafe_destructor)]
 #![allow(unstable)]
 #![allow(dead_code)]
 
@@ -528,12 +529,14 @@ pub fn pa_stream_peek (
     return unsafe { ext::stream::pa_stream_peek(stream, data, nbytes) };
 }
 
-pub struct PulseAudioStream<'a> {
+
+pub struct PulseAudioStream {
     pa_stream: *mut opaque::pa_stream,
     _last_ptr: *const u8
 }
 
-impl<'a> PulseAudioStream<'a> {
+
+impl PulseAudioStream {
     pub fn new(context: *mut pa_context, name: &str, ss: *const pa_sample_spec,
         map: *const pa_channel_map) -> Self {
         PulseAudioStream {
@@ -542,9 +545,8 @@ impl<'a> PulseAudioStream<'a> {
         }
     }
 
-    /// Returns data available for reading.
-    /// Copies the data returned.
-    pub fn peek(&'a mut self) -> IoResult<&'a [u8]> {
+    /// Return the current fragment from Pulse's record stream.
+    pub fn peek(&mut self) -> IoResult<&[u8]> {
         let mut buf: *mut u8 = ptr::null_mut();
         let mut nbytes: size_t = 0;
 
@@ -573,6 +575,18 @@ impl<'a> PulseAudioStream<'a> {
             self._last_ptr = buf as *const u8;
             Ok(slice::from_raw_buf(&self._last_ptr, nbytes as usize))
         }
+    }
+
+
+    /// Disconnects the stream from its source/sink
+    pub fn disconnect(&mut self) {
+        unsafe { ext::stream::pa_stream_disconnect(self.pa_stream) };
+    }
+}
+
+impl Drop for PulseAudioStream {
+    fn drop(&mut self) {
+        self.disconnect();
     }
 }
 
