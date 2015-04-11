@@ -265,8 +265,17 @@ fn main() {
                                 println!("driver: {}", info.get_driver());
                                 println!("===================== end sink_info_callback =======================");
 
-                                context.set_event_callback(move |context, event_type, index| {
-                                    println!("event callback!");
+                                context.set_event_callback(move |context, event, index| {
+                                    let facility = (event & (pa_subscription_event_type::FACILITY_MASK as c_int));
+                                    let ev_type = (event & (pa_subscription_event_type::TYPE_MASK as c_int));
+
+                                    if facility == pa_subscription_event_type::SERVER as c_int {
+                                        if ev_type == pa_subscription_event_type::CHANGE as c_int {
+                                            context.get_server_info(move |context, info| {
+                                                println!("new output: {}", info.get_default_sink_name());
+                                            });
+                                        }
+                                    }
                                 });
 
                                 context.add_subscription(pa_subscription_mask::SERVER, move |context, success| {

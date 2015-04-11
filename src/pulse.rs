@@ -19,7 +19,7 @@ use std::io::{Reader, Writer, IoResult, IoError, IoErrorKind};
 type StateCallback = Fn(Context, pa_context_state) + Send;
 type ServerInfoCallback = Fn(Context, &pa_server_info) + Send;
 type SinkInfoCallback = Fn(Context, Option<&pa_sink_info>) + Send;
-type SubscriptionCallback = Fn(Context, pa_subscription_event_type, u32) + Send;
+type SubscriptionCallback = Fn(Context, c_int, u32) + Send;
 type PaContextSuccessCallback = Fn(Context, bool) + Send;
 
 
@@ -203,7 +203,7 @@ impl Context {
     }
 
     /// Sets the callback for subscriptions
-    pub fn set_event_callback<C>(&self, cb: C) where C: Fn(Context, pa_subscription_event_type, u32), C: Send {
+    pub fn set_event_callback<C>(&self, cb: C) where C: Fn(Context, c_int, u32), C: Send {
         let internal_guard = self.internal.lock();
         let mut internal = internal_guard.unwrap();
         internal.event_cb = Some(Box::new(cb) as BoxedSubscriptionCallback);
@@ -309,7 +309,7 @@ impl ContextInternal {
         }
     }
 
-    fn event_callback(&self, t: pa_subscription_event_type, idx: u32) {
+    fn event_callback(&self, t: c_int, idx: u32) {
         let external = self.external.clone().unwrap();
         match self.event_cb {
             Some(ref cb) => cb(external, t, idx),
@@ -402,7 +402,7 @@ extern fn _sink_info_callback(_: *mut pa_context, info: *const pa_sink_info, eol
 }
 
 /// Subscription callback for C to call.
-extern fn _subscription_event_callback(_: *mut pa_context, t: pa_subscription_event_type, idx: u32, context: *mut c_void) {
+extern fn _subscription_event_callback(_: *mut pa_context, t: c_int, idx: u32, context: *mut c_void) {
     let context_internal = unsafe{ &* (context as *mut ContextInternal) };
     context_internal.event_callback(t, idx);
 }

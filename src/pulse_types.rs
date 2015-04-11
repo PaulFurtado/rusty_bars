@@ -45,7 +45,7 @@ pub mod cb {
 
     pub type pa_context_subscribe_cb_t = extern "C" fn(
         p: *mut pa_context,
-        t: pa_subscription_event_type,
+        t: c_int,
         idx: u32,
         userdata: *mut c_void
     );
