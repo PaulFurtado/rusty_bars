@@ -195,13 +195,18 @@ fn simple_run_analyzer(dev: &str) {
     // TODO: compute_input_size is totally broken.
     let fft_size = analyze_spectrum::compute_input_size(max(width, 512));
 
+
+    let mut fft = fftw_wrapper::AudioFft::new(1024, 2);
+
+
+
     // Initialize the FFT first so that we don't hold up pulseaudio while
     // waiting for the FFT planner
-    let mut fft = analyze_spectrum::AudioFFT::new(fft_size, 2);
+    //let mut fft = analyze_spectrum::AudioFFT::new(fft_size, 2);
 
     // Initialize the buffer we use for reading from pulse audio
-    let mut buffer_vec: Vec<u8> = Vec::with_capacity(fft.get_buf_size());
-    for _ in range(0, fft.get_buf_size()) {
+    let mut buffer_vec: Vec<u8> = Vec::with_capacity(2048);
+    for _ in range(0, 2048) {
         buffer_vec.push(0);
     }
     let mut buffer = buffer_vec.as_mut_slice();
@@ -212,15 +217,22 @@ fn simple_run_analyzer(dev: &str) {
 
     loop {
         pulse.read(buffer).unwrap();
-        let output = fft.execute(buffer);
-        //println!("sup");
-        match vis.render_frame(output) {
-            Err(x) => panic!("error: {}", x),
-            Ok(_) => {}
+        let mut total: usize = buffer.len();
+        let mut processed: usize = 0;
+
+        let mut count = 0;
+        loop {
+            processed += fft.feed_u8_data(buffer.slice_from(processed));
+
+            if processed < total {
+                fft.execute();
+                fft.compute_output();
+                vis.render_frame(fft.get_output()).unwrap();
+            } else {
+                break;
+            }
         }
-        // Commented out code below is for pumping the data to a client
-        //let temp: Vec<String> = output.iter().map(|x| format!("{}", x)).collect();
-        //println!("{}", temp.connect(", "));
+
     }
 }
 

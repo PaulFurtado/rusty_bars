@@ -102,13 +102,13 @@ fn fftw_ralloc<T>(count: usize) -> Option<*mut T> {
 /// when it is dropped so stopping that would involve hacks.
 /// The FftAlignedArray struct doesn't implement any features a Vec does,
 /// instead, it just gives you back slices so you can do
-struct FftwAlignedArray<'a, T> {
+pub struct FftwAlignedArray<'a, T> {
     len: usize,
     ptr: *const T,
     mut_ptr: *mut T,
 }
 
-impl<'a, T> FftwAlignedArray<'a, T> {
+impl<'a, T: Copy> FftwAlignedArray<'a, T> {
     /// Create a new FftwAlignedArray.
     /// Len is the number of elements, not the size in bytes.
     /// Panics if memory allocation fails.
@@ -118,6 +118,13 @@ impl<'a, T> FftwAlignedArray<'a, T> {
             len: len,
             ptr: ptr as *const T,
             mut_ptr: ptr
+        }
+    }
+
+    /// Initialize every element in the array with init_val
+    fn initialize(&mut self, init_val: T) {
+        for val in self.as_mut_slice().iter_mut() {
+            *val = init_val;
         }
     }
 
@@ -172,8 +179,10 @@ impl<'a> FftwPlan<'a> {
             panic!("FFT size should be a power of two!");
         }
 
-        let input = FftwAlignedArray::new(size);
-        let output = FftwAlignedArray::new(size);
+        let mut input = FftwAlignedArray::new(size);
+        input.initialize(0.0);
+        let mut output = FftwAlignedArray::new(size);
+        output.initialize(FftwComplex{re: 0.0, im: 0.0});
 
         let plan = unsafe {
             ext::fftw_plan_dft_r2c_1d(
@@ -221,7 +230,7 @@ impl<'a> Drop for FftwPlan<'a> {
 
 
 /// An FFT for multiple channels of data.
-struct MultiChannelFft<'a> {
+pub struct MultiChannelFft<'a> {
     /// The size of the FFTs to be run
     size: usize,
     /// The number of channels
@@ -305,7 +314,7 @@ impl HanningWindowCalculator {
 
 
 /// Audio FFT for 16bit little endian audio data (S16LE)
-struct AudioFft<'a> {
+pub struct AudioFft<'a> {
     /// The multichannel fft object that does the work for us
     multichan_fft: MultiChannelFft<'a>,
     /// The input cursor indicates how much data has been read in. Input is
@@ -326,8 +335,8 @@ struct AudioFft<'a> {
 impl<'a> AudioFft<'a> {
     /// Create a new AudioFft
     pub fn new(fft_size: usize, channel_count: usize) -> AudioFft<'a> {
-        let mut out_vec = Vec::with_capacity(fft_size);
-        for _ in (0..fft_size) {
+        let mut out_vec = Vec::with_capacity(fft_size/2);
+        for _ in (0..fft_size/2) {
             out_vec.push(0.0);
         }
         AudioFft {
@@ -339,6 +348,12 @@ impl<'a> AudioFft<'a> {
             output: out_vec,
         }
     }
+
+    pub fn execute(&mut self) {
+        self.multichan_fft.execute();
+        self.input_cursor = 0;
+    }
+
 
     /// Allows a client to feed data into the FFT in chunks. This is useful for
     /// ineracting with PulseAudio because its asynchronous API gives audio data
@@ -370,11 +385,17 @@ impl<'a> AudioFft<'a> {
         bytes_read
     }
 
+    pub fn feed_u8_data(&mut self, input: &[u8]) -> usize {
+        let i16_ptr: *const i16 = input.as_ptr() as *const i16;
+        self.feed_data(unsafe{ slice::from_raw_buf(&i16_ptr, input.len()/2) }) * 2
+    }
+
+
     /// Computes the combined output of all channels
     pub fn compute_output(&mut self) {
         let mut first = true;
         for channel in self.multichan_fft.channel_plans.iter() {
-            for (index, &value) in channel.output.as_slice().iter().enumerate() {
+            for (index, &value) in channel.output.as_slice().slice_to(self.fft_size/2).iter().enumerate() {
                 // Turn the FFT output value into decibals
                 let power: f64 = 20.0 * value.abs().log10();
                 // If it's bigger than the biggest value for this channel for
