@@ -529,7 +529,6 @@ pub fn pa_context_set_subscribe_callback(c: *mut pa_context, cb: pa_context_subs
 }
 
 
-
 fn pa_stream_new(c: *mut opaque::pa_context, name: &str, ss: *const pa_sample_spec, map: *const pa_channel_map) -> *mut opaque::pa_stream {
     assert!(!c.is_null());
     let name = CString::from_slice(name.as_bytes());
@@ -548,7 +547,7 @@ fn pa_stream_peek (
 
 
 fn pa_stream_connect_record(
-    stream: &mut opaque::pa_stream,
+    stream: *mut opaque::pa_stream,
     source_name: Option<&str>,
     buffer_attributes: Option<&pa_buffer_attr>,
     stream_flags: Option<pa_stream_flags_t>) -> Result<c_int, String> {
@@ -623,15 +622,31 @@ impl PulseAudioStream {
     }
 
 
-    /// Disconnects the stream from its source/sink
+    /// Record playback from a source.
+    /// Args:
+    ///    source_name: The name of the source to record from. If none, use the
+    ///        default source.
+    ///    buffer_attributes: Options on the default buffer.
+    ///    stream_flags: Options for the stream.
+    pub fn connect_record(
+        &mut self,
+        source_name: Option<&str>,
+        buffer_attributes: Option<&pa_buffer_attr>,
+        stream_flags: Option<pa_stream_flags_t>) -> Result<c_int, String> {
+        pa_stream_connect_record(
+            self.pa_stream, source_name, buffer_attributes, stream_flags)
+    }
+
+
+    /// Disconnect the stream from its source/sink.
     pub fn disconnect(&mut self) {
-        unsafe { ext::stream::pa_stream_disconnect(self.pa_stream) };
+        unsafe { ext::stream::pa_stream_disconnect(self.pa_stream) }
     }
 }
 
 impl Drop for PulseAudioStream {
     fn drop(&mut self) {
-        self.disconnect();
+        self.disconnect()
     }
 }
 
