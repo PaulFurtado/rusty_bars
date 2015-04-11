@@ -245,6 +245,72 @@ pub mod enums {
         CARD = 0x0200,
     }
 
+    #[repr(C)]
+    #[derive(Copy)]
+    pub enum pa_stream_flags_t {
+        /// Default option -- no flags necessary.
+        PA_STREAM_NOFLAGS = 0x0000,
+        /// Starts the stream as "corked", requiring it to be uncorked before
+        /// playback.
+        PA_STREAM_START_CORKED = 0x0001,
+        /// Interpolate the latency for this stream.
+        PA_STREAM_INTERPOLATE_TIMING = 0x0002,
+        /// Don't force time to increase monotonically.
+        PA_STREAM_NOT_MONOTONIC = 0x0004,
+        /// Issue timing updates automatically.
+        PA_STREAM_AUTO_TIMING_UPDATE = 0x0008,
+        /// Remap channels by index instead of name.
+        /// Ignored by PA servers <0.9.8
+        PA_STREAM_NO_REMAP_CHANNELS = 0x0010,
+        /// Don't up/downmix channels remapped by name to related channels.
+        /// Ignored by PA servers <0.9.8
+        PA_STREAM_NO_REMIX_CHANNELS = 0x0020,
+        /// Use the sample format of the sink/device this stream is connected to
+        /// Ignored by PA servers <0.9.8
+        PA_STREAM_FIX_FORMAT = 0x0040,
+        /// Use the sample rate of the sink.
+        /// Ignored by PA servers <0.9.8
+        PA_STREAM_FIX_RATE = 0x0080,
+        /// Use the sink's number of channels and channel map.
+        /// Ignored by PA servers <0.9.8
+        PA_STREAM_FIX_CHANNELS = 0x0100,
+        /// Don't allow moving of this stream to another sink/device.
+        /// Ignored by PA servers <0.9.8
+        PA_STREAM_DONT_MOVE = 0x0200,
+        /// Allow dynamic changing of the sampling rate during playback
+        /// Ignored by PA servers <0.9.8
+        PA_STREAM_VARIABLE_RATE = 0x0400,
+        /// Find peaks instead of resampling.
+        /// Ignored by PA servers <0.9.11
+        PA_STREAM_PEAK_DETECT = 0x0800,
+        /// Create in muted state.
+        /// If neither PA_STREAM_START_UNMUTED nor PA_STREAM_START_MUTED is set,
+        /// the server to decide if the stream is muted or not on creation.
+        /// Ignored by PA servers <0.9.11
+        PA_STREAM_START_MUTED = 0x1000,
+        /// Adjust sink/source's latency based on the requested buffer metrics.
+        /// Ignored by PA servers <0.9.11
+        PA_STREAM_ADJUST_LATENCY = 0x2000,
+        /// Ignored by PA servers <0.9.12
+        PA_STREAM_EARLY_REQUESTS = 0x4000,
+        /// Don't inhibit the connected device from auto-suspending
+        /// Ignored by PA servers <0.9.15
+        PA_STREAM_DONT_INHIBIT_AUTO_SUSPEND = 0x8000,
+        /// Create in unmuted state.
+        /// Ignored by PA servers <0.9.15
+        PA_STREAM_START_UNMUTED = 0x10000,
+        /// Fail to create streams on suspended devices, and terminate the
+        /// stream if device suspend.
+        /// Ignored by PA servers <0.9.15
+        PA_STREAM_FAIL_ON_SUSPEND = 0x20000,
+        /// Consider this stream's volume relative to the sink's current volume.
+        /// Ignored by PA servers <0.9.20
+        PA_STREAM_RELATIVE_VOLUME = 0x40000,
+        /// The stream's data will be rendered by passthrough sinks, and not
+        /// reformatted or resampled.
+        /// Ignored by PA servers <1.0
+        PA_STREAM_PASSTHROUGH = 0x80000
+    }
 }
 
 pub mod structs {
