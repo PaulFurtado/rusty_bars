@@ -382,19 +382,6 @@ impl SubscriptionManager {
 }
 
 
-
-
-
-/// Utility to convert C strings to String objects
-/// TODO: standard library
-pub fn cstr_to_string(c_str: *const c_char) -> String {
-    let len: usize = unsafe{ strlen(c_str) } as usize;
-    let s = unsafe{ String::from_raw_parts(c_str as *mut u8, len, len) };
-    let retval = s.clone();
-    unsafe{ mem::forget(s) };
-    retval
-}
-
 /// State callback for C to call. Takes a ContextInternal and calls its
 /// server_info_callback method.
 extern fn _state_callback(_: *mut pa_context, context: *mut c_void) {
