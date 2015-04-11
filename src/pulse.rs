@@ -236,6 +236,7 @@ impl ContextInternal {
 }
 
 /// Utility to convert C strings to String objects
+/// TODO: standard library
 pub fn cstr_to_string(c_str: *const c_char) -> String {
     let len: usize = unsafe{ strlen(c_str) } as usize;
     let s = unsafe{ String::from_raw_parts(c_str as *mut u8, len, len) };
@@ -258,6 +259,12 @@ extern fn _server_info_callback(_: *mut pa_context, info: *const pa_server_info,
     context_internal.server_info_callback(unsafe{ &*info });
 }
 
+/// A safe interface to pa_context_set_state_callback
+pub fn pa_context_set_state_callback(context: *mut opaque::pa_context,
+    cb: cb::pa_context_notify_cb_t, userdata: *mut c_void) {
+    assert!(!context.is_null());
+    unsafe { ext::pa_context_set_state_callback(context, cb, userdata) };
+}
 
 /// A rust wrapper around pa_context_disconnect.
 /// Immediately/synchronously disconnect from the PulseAudio server.
@@ -329,13 +336,14 @@ pub fn pa_mainloop_new() -> *mut opaque::pa_mainloop {
     return mainloop;
 }
 
-
-/// A safe interface to pa_context_set_state_callback
-pub fn pa_context_set_state_callback(context: *mut opaque::pa_context,
-    cb: cb::pa_context_notify_cb_t, userdata: *mut c_void) {
-    assert!(!context.is_null());
-    unsafe { ext::pa_context_set_state_callback(context, cb, userdata) };
+/// Gets sink info by the sink's name
+pub fn pa_context_get_sink_info_by_name(c: *mut pa_context, name: &str, cb: pa_sink_info_cb_t, userdata: *mut c_void) {
+    assert!(!c.is_null());
+    let name = CString::from_slice(name.as_bytes());
+    unsafe{ ext::pa_context_get_sink_info_by_name(c, name.as_ptr(), cb, userdata) };
 }
+
+
 
 mod ext {
     extern crate libc;
@@ -362,6 +370,13 @@ mod ext {
             cb: cb::pa_context_notify_cb_t,
             userdata: *mut c_void
         );
+
+        pub fn pa_context_get_sink_info_by_name(
+            c: *mut pa_context,
+            name: *const c_char,
+            cb: pa_sink_info_cb_t,
+            userdata: *mut c_void
+        ) -> *mut pa_operation;
 
         pub fn pa_context_connect(
             context: *mut opaque::pa_context,

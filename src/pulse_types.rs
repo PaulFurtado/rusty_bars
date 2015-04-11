@@ -3,6 +3,7 @@
 #![allow(dead_code)]
 #![allow(raw_pointer_derive)]
 
+use std::str;
 pub use self::cb::*;
 pub use self::opaque::*;
 pub use self::enums::*;
@@ -199,7 +200,8 @@ pub mod enums {
 
 pub mod structs {
     extern crate libc;
-    use self::libc::{c_int, c_char, c_void};
+    use self::libc::{c_int, c_char, c_void, strlen};
+    use std::{str, slice, mem};
     use super::types::*;
     use super::enums::*;
     use super::opaque::*;
@@ -260,7 +262,7 @@ pub mod structs {
 
     #[repr(C)]
     #[derive(Copy)]
-    pub struct pa_server_info {
+    pub struct pa_server_info<'a> {
         pub user_name: *const c_char,
         pub host_name: *const c_char,
         pub server_version: *const c_char,
@@ -271,6 +273,39 @@ pub mod structs {
         pub cookie: u32,
         pub channel_map: pa_channel_map
     }
+
+    impl<'a> pa_server_info<'a> {
+        fn get_str(&'a self, c_buf: &'a *const c_char) -> &'a str {
+            let len = unsafe{ strlen(*c_buf) } as usize;
+            let slice: &[c_char] = unsafe{ slice::from_raw_buf(c_buf, len) };
+            str::from_utf8(unsafe{ mem::transmute(slice) }).unwrap()
+        }
+
+        pub fn get_user_name(&'a self) -> &'a str {
+            self.get_str(&self.user_name)
+        }
+
+        pub fn get_host_name(&'a self) -> &'a str {
+            self.get_str(&self.host_name)
+        }
+
+        pub fn get_server_version(&'a self) -> &'a str {
+            self.get_str(&self.server_version)
+        }
+
+        pub fn get_server_name(&'a self) -> &'a str {
+            self.get_str(&self.server_name)
+        }
+
+        pub fn get_default_sink_name(&'a self) -> &'a str {
+            self.get_str(&self.default_sink_name)
+        }
+
+        pub fn get_default_source_name(&'a self) -> &'a str {
+            self.get_str(&self.default_source_name)
+        }
+    }
+
 
     #[repr(C)]
     #[derive(Copy)]
