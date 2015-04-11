@@ -66,15 +66,12 @@ pub struct FftwComplex {
     im: f64
 }
 
-
 impl FftwComplex {
     /// Get the absolute value (distance from zero) of the complex number
     pub fn abs(&self) -> f64 {
         ((self.re * self.re) + (self.im * self.im)).sqrt()
     }
 }
-
-
 
 /// Wrapper around fftw_malloc which automatically allocates the right amount of
 /// space for Rust objects, similar to calloc.
@@ -260,12 +257,143 @@ impl<'a> MultiChannelFft<'a> {
     fn get_channel_mut(&'a mut self, index: usize) -> Option<&'a mut FftwPlan> {
         self.channel_plans.get_mut(index)
     }
+
+    /// Execute all of the FFT channels
+    fn execute(&mut self) {
+        for plan in self.channel_plans.iter_mut() {
+            plan.execute();
+        }
+    }
+
 }
 
 /// Determine if a number is a power of two
 fn is_power_of_two(x: usize) -> bool {
     (x != 0) && ((x & (x - 1)) == 0)
 }
+
+
+/// Precomputes the multipliers for the hanning window function so computing
+/// the value only takes a single multiplication.
+pub struct HanningWindowCalculator {
+    multipliers: Vec<f64>
+}
+
+
+impl HanningWindowCalculator {
+    /// The constructor computes the cache of hanning window multiplier values
+    fn new(fft_size: usize) -> HanningWindowCalculator {
+        let mut multipliers: Vec<f64> = Vec::with_capacity(fft_size);
+        let divider: f64 = (fft_size - 1) as f64;
+
+        for i in (0..fft_size) {
+            let cos_inner: f64 = 2.0 * PI * (i as f64) / divider;
+            let cos_part: f64 = cos_inner.cos();
+            let multiplier: f64 = 0.5 * (1.0 - cos_part);
+            multipliers.push(multiplier);
+        }
+
+        HanningWindowCalculator{multipliers: multipliers}
+    }
+
+    /// Multiplies the given value against the hanning window multiplier value
+    /// for this index
+    fn get_value(&self, index: usize, val: f64) -> f64 {
+        self.multipliers[index] * val
+    }
+}
+
+
+/// Audio FFT for 16bit little endian audio data (S16LE)
+struct AudioFft<'a> {
+    /// The multichannel fft object that does the work for us
+    multichan_fft: MultiChannelFft<'a>,
+    /// The input cursor indicates how much data has been read in. Input is
+    /// 16bit integers, inerleaved by channels. The so that means the maximum
+    /// value of input_cursor is channel_count * fft_size
+    input_cursor: usize,
+    /// The size of the FFT
+    fft_size: usize,
+    /// The number of audio channels. Ex: 2 for stereo audio.
+    channel_count: usize,
+    /// Helper for executing the Hanning window function as data is inserted
+    hanning: HanningWindowCalculator,
+    /// Holds output for the combined channels
+    output: Vec<f64>
+}
+
+
+impl<'a> AudioFft<'a> {
+    /// Create a new AudioFft
+    pub fn new(fft_size: usize, channel_count: usize) -> AudioFft<'a> {
+        let mut out_vec = Vec::with_capacity(fft_size);
+        for _ in (0..fft_size) {
+            out_vec.push(0.0);
+        }
+        AudioFft {
+            multichan_fft: MultiChannelFft::new(fft_size, channel_count),
+            input_cursor: 0,
+            fft_size: fft_size,
+            channel_count: channel_count,
+            hanning: HanningWindowCalculator::new(fft_size),
+            output: out_vec,
+        }
+    }
+
+    /// Allows a client to feed data into the FFT in chunks. This is useful for
+    /// ineracting with PulseAudio because its asynchronous API gives audio data
+    /// in seemingly arbitrary chunks.
+    /// Returns the number of bytes it read. If the number of bytes returned is
+    /// less than the input size, the FFT is ready to execute.
+    pub fn feed_data(&mut self, input: &[i16]) -> usize {
+        let mut bytes_read: usize = 0;
+        let total_input = self.channel_count * self.fft_size;
+
+        let mut inputs: Vec<&mut [f64]> = Vec::with_capacity(self.channel_count);
+        for channel in self.multichan_fft.channel_plans.iter_mut() {
+            inputs.push(channel.get_input_slice());
+        }
+
+        for value in input.iter() {
+            if self.input_cursor == total_input {
+                return bytes_read;
+            }
+            // The channel number the current value is for
+            let channel_num = self.input_cursor % self.channel_count;
+            // The index of the value in its channel
+            let channel_index = self.input_cursor / self.channel_count;
+            inputs[channel_num][channel_index] = self.hanning.get_value(channel_index, *value as f64);
+            bytes_read += 1;
+            self.input_cursor += 1;
+        }
+
+        bytes_read
+    }
+
+    /// Computes the combined output of all channels
+    pub fn compute_output(&mut self) {
+        let mut first = true;
+        for channel in self.multichan_fft.channel_plans.iter() {
+            for (index, &value) in channel.output.as_slice().iter().enumerate() {
+                // Turn the FFT output value into decibals
+                let power: f64 = 20.0 * value.abs().log10();
+                // If it's bigger than the biggest value for this channel for
+                // this execution, then replace the current value
+                if first || power > self.output[index] {
+                    self.output[index] = power;
+                }
+            }
+            first = false;
+        }
+    }
+
+    /// Borrow the combined output vector
+    pub fn get_output(&self) -> &Vec<f64> {
+        &self.output
+    }
+}
+
+
 
 
 #[test]
