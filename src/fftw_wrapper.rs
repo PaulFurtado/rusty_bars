@@ -13,7 +13,7 @@ use std::{ptr, mem, slice};
 mod ext {
     extern crate libc;
     use self::libc::{c_int, size_t, c_void};
-    use super::{FftwPlan, FftwComplex};
+    use super::{FftwPlan, FftwComplex, PlannerFlags};
 
     #[repr(C)]
     #[derive(Copy)]
@@ -23,7 +23,7 @@ mod ext {
     #[link(name="fftw3")]
     extern {
         /// Creates a 1-dimensional real-to-complex FFT plan
-        pub fn fftw_plan_dft_r2c_1d(n: c_int, input: *mut f64, output: *mut FftwComplex, flags: c_int) -> *const fftw_plan;
+        pub fn fftw_plan_dft_r2c_1d(n: c_int, input: *mut f64, output: *mut FftwComplex, flags: PlannerFlags) -> *mut fftw_plan;
 
         /// Executes an FFTW plan
         pub fn fftw_execute(plan: *const fftw_plan);
@@ -43,17 +43,37 @@ mod ext {
 #[derive(Copy)]
 /// Thse can be found in fftw/api/fftw2.h in the FFW source. In FFTW, they are
 /// defined with #define.
+/// You can read more about planner flags here:
+/// http://www.fftw.org/doc/Planner-Flags.html
 pub enum PlannerFlags {
-    MEASURE = 0,
-    DESTROY_INPUT = 1 << 0,
-    UNALIGNED = 1 << 1,
-    CONSERVE_MEMORY = 1U << 2,
-    EXHAUSTIVE = 1U << 3,
-    PRESERVE_INPUT = 1U << 4,
-    PATIENT = 1U << 5,
-    ESTIMATE = 1U << 6,
-    WISDOM_ONLY = 1U << 21,
+    Measure         = 0,
+    DestroyInput    = 1 << 0,
+    Unaligned       = 1 << 1,
+    ConserveMemory  = 1 << 2,
+    Exhaustive      = 1 << 3,
+    PreserveInput   = 1 << 4,
+    Patient         = 1 << 5,
+    Estimate        = 1 << 6,
+    WisdomOnly      = 1 << 21,
 }
+
+
+#[repr(C)]
+#[derive(Copy)]
+/// Represents a 64-bit complex number.
+pub struct FftwComplex {
+    re: f64,
+    im: f64
+}
+
+
+impl FftwComplex {
+    /// Get the absolute value (distance from zero) of the complex number
+    pub fn abs(&self) -> f64 {
+        ((self.re * self.re) + (self.im * self.im)).sqrt()
+    }
+}
+
 
 
 /// Wrapper around fftw_malloc which automatically allocates the right amount of
@@ -144,7 +164,7 @@ pub struct FftwPlan<'a> {
     input: FftwAlignedArray<'a, f64>,
     output: FftwAlignedArray<'a, FftwComplex>,
     size: usize,
-    plan: *const ext::fftw_plan,
+    plan: *mut ext::fftw_plan,
 }
 
 
@@ -163,11 +183,11 @@ impl<'a> FftwPlan<'a> {
                 size as i32,
                 input.as_mut_ptr(),
                 output.as_mut_ptr(),
-                FFTW_MEASURE
+                PlannerFlags::Measure
             )
         };
 
-        FftwPlan2 {
+        FftwPlan {
             input: input,
             output: output,
             size: size,
@@ -194,9 +214,9 @@ impl<'a> FftwPlan<'a> {
 
 #[unsafe_destructor]
 /// Unsafe because it has lifetimes.
-impl<'a> Drop for FftwPlan {
+impl<'a> Drop for FftwPlan<'a> {
     /// Runds fftw_destroy plan when a plan goes out of scope
-    fn drop(&'a mut self) {
+    fn drop(&mut self) {
         unsafe { ext::fftw_destroy_plan(self.plan); }
     }
 }
@@ -220,7 +240,7 @@ impl<'a> MultiChannelFft<'a> {
         let mut channel_plans: Vec<FftwPlan> = Vec::with_capacity(channel_count);
 
         for _ in (0..channel_count) {
-            channel_plans.push(FftwPlan2::new(size));
+            channel_plans.push(FftwPlan::new(size));
         }
         channel_plans.shrink_to_fit();
 
@@ -232,12 +252,32 @@ impl<'a> MultiChannelFft<'a> {
     }
 
     /// Return a borrowed reference to the plan for a channel
-    fn get_channel(&'a self, index: usize) -> Option<&'a FftwPlan2> {
+    fn get_channel(&'a self, index: usize) -> Option<&'a FftwPlan> {
         self.channel_plans.get(index)
     }
 
     /// Return a mutable borrowed reference to the plan for a channel
-    fn get_channel_mut(&'a mut self, index: usize) -> Option<&'a mut FftwPlan2> {
+    fn get_channel_mut(&'a mut self, index: usize) -> Option<&'a mut FftwPlan> {
         self.channel_plans.get_mut(index)
     }
+}
+
+/// Determine if a number is a power of two
+fn is_power_of_two(x: usize) -> bool {
+    (x != 0) && ((x & (x - 1)) == 0)
+}
+
+
+#[test]
+fn test_pwer_two() {
+    assert!(is_power_of_two(1024));
+    assert!(is_power_of_two(512));
+    assert!(is_power_of_two(2));
+    assert!(is_power_of_two(4));
+    assert!(is_power_of_two(8));
+    assert!(is_power_of_two(16));
+    assert!(is_power_of_two(32));
+    assert!(!is_power_of_two(1));
+    assert!(!is_power_of_two(7));
+    assert!(!is_power_of_two(500));
 }

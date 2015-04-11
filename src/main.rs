@@ -16,6 +16,7 @@ use libc::funcs::c95::string::strlen;
 use std::cmp::max;
 pub mod analyze_spectrum;
 pub mod visualizer;
+mod fftw_wrapper;
 mod ncurses_wrapper;
 mod pulse_types;
 mod pulse;
