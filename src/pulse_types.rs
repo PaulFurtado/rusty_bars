@@ -14,7 +14,7 @@ pub use self::types::*;
 /// For callback signatures
 pub mod cb {
     extern crate libc;
-    use self::libc::{c_int, c_void};
+    use self::libc::{c_int, c_void, size_t};
     use super::opaque::*;
     use super::structs::*;
     use super::enums::*;
@@ -39,7 +39,7 @@ pub mod cb {
 
     pub type pa_stream_request_cb_t = extern "C" fn(
         p: *mut pa_stream,
-        nbytes: c_int,
+        nbytes: size_t,
         *mut c_void
     );
 
