@@ -383,6 +383,18 @@ pub fn pa_context_get_sink_info_by_name(c: *mut pa_context, name: &str, cb: pa_s
     unsafe{ ext::pa_context_get_sink_info_by_name(c, name.as_ptr(), cb, userdata) };
 }
 
+/// Subscribe to an event
+pub fn pa_context_subscribe(c: *mut pa_context, m: pa_subscription_mask, cb: pa_context_success_cb_t, userdata: *mut c_void) {
+    assert!(!c.is_null());
+    unsafe{ ext::pa_context_subscribe(c, m, cb, userdata) };
+}
+
+/// Set the callback for all subscriptions
+pub fn pa_context_set_subscribe_callback(c: *mut pa_context, cb: pa_context_subscribe_cb_t, userdata: *mut c_void) {
+    assert!(!c.is_null());
+    unsafe{ ext::pa_context_set_subscribe_callback(c, cb, userdata) };
+}
+
 
 struct PulseAudioStream {
     pa_stream: *mut opaque::pa_stream
