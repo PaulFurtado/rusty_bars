@@ -330,6 +330,16 @@ pub mod structs {
         pub plist: *mut pa_proplist
     }
 
+    #[repr(C)]
+    #[derive(Copy)]
+    pub struct pa_buffer_attr {
+        pub max_length: u32,
+        pub tlength: u32,
+        pub prebuf: u32,
+        pub minreq: u32,
+        pub fragsize: u32
+    }
+
     /// Impl for making it easy to get string values from pa_server_info
     impl<'a> pa_server_info<'a> {
         pub fn get_user_name(&'a self) -> &'a str {
