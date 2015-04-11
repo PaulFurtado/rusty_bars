@@ -253,6 +253,7 @@ fn main() {
                                 println!("name: {}", info.get_name());
                                 println!("description: {}", info.get_description());
                                 println!("monitor_source: {}", info.get_monitor_source_name());
+                                println!("monitor_source index: {}", info.monitor_source);
                                 println!("driver: {}", info.get_driver());
                                 println!("===================== end sink_info_callback =======================");
                             },
