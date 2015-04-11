@@ -265,7 +265,10 @@ fn main() {
                                 println!("driver: {}", info.get_driver());
                                 println!("===================== end sink_info_callback =======================");
 
-                                context.set_event_callback();
+                                context.set_event_callback(move |context, event_type, index| {
+                                    println!("event callback!");
+                                });
+
                                 context.add_subscription(pa_subscription_mask::SERVER, move |context, success| {
                                     if !success {
                                         println!("failed to subscribe to event!");

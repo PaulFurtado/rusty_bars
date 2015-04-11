@@ -201,9 +201,10 @@ impl Context {
     }
 
     /// Sets the callback for subscriptions
-    pub fn set_event_callback(&self) {
+    pub fn set_event_callback<C>(&self, cb: C) where C: Fn(Context, pa_subscription_event_type, u32), C: Send {
         let internal_guard = self.internal.lock();
         let mut internal = internal_guard.unwrap();
+        internal.event_cb = Some(Box::new(cb) as BoxedSubscriptionCallback);
         pa_context_set_subscribe_callback(internal.ptr, _subscription_event_callback, internal.as_void_ptr());
     }
 
