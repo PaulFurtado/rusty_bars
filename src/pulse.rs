@@ -532,7 +532,7 @@ pub struct PulseAudioStream {
     pa_stream: *mut opaque::pa_stream
 }
 
-impl PulseAudioStream {
+impl<'a> PulseAudioStream {
     pub fn new(context: *mut pa_context, name: &str, ss: *const pa_sample_spec,
         map: *const pa_channel_map) -> Self {
         PulseAudioStream {
@@ -540,8 +540,9 @@ impl PulseAudioStream {
         }
     }
 
-    /// Reads data into
-    pub fn peek(&mut self) -> IoResult<Vec<u8>> {
+    /// Returns data available for reading.
+    /// Copies the data returned.
+    pub fn peek(&'a mut self) -> IoResult<&'a [u8]> {
         let mut buf: *mut u8 = ptr::null_mut();
         let mut nbytes: size_t = 0;
 
@@ -566,10 +567,11 @@ impl PulseAudioStream {
             }
         }
 
+        let mut data: &[u8];
         unsafe {
-            let data: Vec<u8> = Vec::from_raw_buf(buf, nbytes as usize);
-            return Ok(data);
+            data = slice::from_raw_buf(&(buf as *const u8), nbytes as usize);
         }
+        return Ok(data);
     }
 }
 
