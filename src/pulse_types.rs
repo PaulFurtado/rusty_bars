@@ -179,9 +179,8 @@ pub mod enums {
         PA_SINK_HW_MUTE_CTRL = 0x0010is,
         PA_SINK_DECIBEL_VOLUME = 0x0020is,
         PA_SINK_FLAT_VOLUME = 0x0040is,
-        PA_SINK_DYNAMIC_LATENCY = 0x0080is
+        PA_SINK_DYNAMIC_LATENCY = 0x0080is,
     }
-
 
     #[repr(C)]
     #[derive(Copy)]
@@ -196,6 +195,45 @@ pub mod enums {
         PA_ENCODING_MAX,
         PA_ENCODING_INVALID = -1,
     }
+
+    #[repr(C)]
+    #[derive(Copy)]
+    pub enum pa_subscription_event_type {
+        SINK = 0x0000,
+        SOURCE = 0x0001,
+        SINK_INPUT = 0x0002,
+        SOURCE_OUTPUT = 0x0003,
+        MODULE = 0x0004,
+        CLIENT = 0x0005,
+        SAMPLE_CACHE = 0x0006,
+        SERVER = 0x0007,
+        AUTOLOAD = 0x0008,
+        CARD = 0x0009,
+        FACILITY_MASK = 0x000F,
+        //XXX: Sigh. PulseAudio uses 0 in this enum multiple times. Rust doesn't
+        //XXX: support this.
+        //NEW = 0x0000,
+        CHANGE = 0x0010,
+        REMOVE = 0x0020,
+        TYPE_MASK = 0x0030,
+    }
+
+    #[repr(C)]
+    #[derive(Copy)]
+    pub enum pa_subscription_mask {
+        NULL = 0x0000,
+        SINK = 0x0001,
+        SOURCE = 0x0002,
+        SINK_INPUT = 0x0004,
+        SOURCE_OUTPUT = 0x0008,
+        MODULE = 0x0010,
+        CLIENT = 0x0020,
+        SAMPLE_CACHE = 0x0040,
+        SERVER = 0x0080,
+        AUTOLOAD = 0x0100,
+        CARD = 0x0200,
+    }
+
 }
 
 pub mod structs {
