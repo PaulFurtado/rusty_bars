@@ -540,8 +540,7 @@ impl<'a> PulseAudioStream {
         }
     }
 
-    /// Returns data available for reading.
-    /// Copies the data returned.
+    /// Return the current fragment from Pulse's record stream.
     pub fn peek(&'a mut self) -> IoResult<&'a [u8]> {
         let mut buf: *mut u8 = ptr::null_mut();
         let mut nbytes: size_t = 0;
@@ -572,6 +571,13 @@ impl<'a> PulseAudioStream {
             data = slice::from_raw_buf(&(buf as *const u8), nbytes as usize);
         }
         return Ok(data);
+    }
+
+
+    /// Remove the current fragment on Pulse's record streams.
+    pub fn drop_fragment(&mut self) -> IoResult<()> {
+        unsafe { ext::stream::pa_stream_drop(self.pa_stream) };
+        Ok(())
     }
 }
 
