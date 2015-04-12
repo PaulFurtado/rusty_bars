@@ -280,18 +280,19 @@ fn main() {
                                 };
 
 
-                                let mut vis = visualizer::Visualizer::new();
-                                let width = vis.get_width();
-                                let mut fft = fftw_wrapper::AudioFft::new(1024, 2);
+                                //let mut vis = visualizer::Visualizer::new();
+                                //let width = vis.get_width();
+                                //let mut fft = fftw_wrapper::AudioFft::new(1024, 2);
 
                                 let mut stream = context.create_stream("rs_client", &sample_spec, None);
 
                                 stream.set_read_callback(move |mut stream, nbytes| {
                                     //let foo: &[u8] = stream.peek().unwrap();
-                                    fft.feed_u8_data(stream.peek().unwrap());
-                                    fft.execute();
-                                    fft.compute_output();
-                                    vis.render_frame(fft.get_output()).unwrap();
+                                    println!("called....");
+                                    //fft.feed_u8_data(stream.peek().unwrap());
+                                    //fft.execute();
+                                    //fft.compute_output();
+                                    //vis.render_frame(fft.get_output()).unwrap();
                                 });
 
 
