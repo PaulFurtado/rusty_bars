@@ -254,12 +254,13 @@ fn run_analyzer(dev: &str) {
     let mut context = mainloop.create_context("rs_client");
     let mut stream = context.create_stream("rs_client", &sample_spec, None);
 
+
     stream.set_read_callback(move |mut stream, nbytes| {
         let foo: &[u8] = stream.peek().unwrap();
-        fft.feed_u8_data(stream.peek().unwrap());
-        fft.execute();
-        fft.compute_output();
-        vis.render_frame(fft.get_output()).unwrap();
+        //fft.feed_u8_data(stream.peek().unwrap());
+        //fft.execute();
+        //fft.compute_output();
+        //vis.render_frame(fft.get_output()).unwrap();
     });
 
     context.connect(None, pulse::pa_context_flags::NOAUTOSPAWN);

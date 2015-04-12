@@ -22,7 +22,7 @@ type ServerInfoCallback = Fn(Context, &pa_server_info) + Send;
 type SinkInfoCallback = Fn(Context, Option<&pa_sink_info>) + Send;
 type SubscriptionCallback = Fn(Context, c_int, u32) + Send;
 type PaContextSuccessCallback = Fn(Context, bool) + Send;
-type PaStreamRequestCallback = Fn(PulseAudioStream, size_t) + Send; // XXX
+type PaStreamRequestCallback = FnMut(PulseAudioStream, size_t) + Send; // XXX
 
 
 // Boxed types for callback closures
@@ -425,7 +425,7 @@ extern fn _subscription_success_callback(_: *mut pa_context, success: c_int,  co
 /// audio data available to read.
 extern fn _pa_stream_read_callback(
     _: *mut opaque::pa_stream, nbytes: size_t,  userdata: *mut c_void) {
-    let stream_internal = unsafe{ &* (
+    let stream_internal = unsafe{ &mut * (
         userdata as *mut PulseAudioStreamInternal) };
     stream_internal.read_callback(nbytes);
 }
@@ -613,13 +613,13 @@ impl PulseAudioStreamInternal {
 
     /// Called when the underlying stream has data available
     /// for reading.
-    pub fn read_callback(&self, nbytes: size_t) {
+    pub fn read_callback(&mut self, nbytes: size_t) {
         assert!(!self.external.is_none());
         assert!(!self.pa_stream.is_null());
 
         let external = self.external.clone().unwrap();
         match self.read_cb {
-            Some(ref cb) => cb(external, nbytes),
+            Some(ref mut cb) => cb(external, nbytes),
             None => println!("[PulseAudioStream] warning: read callback called, no read callback set.")
         }
     }
@@ -759,7 +759,7 @@ impl PulseAudioStream {
     }
 
     /// Sets the read callback
-    pub fn set_read_callback<C>(&mut self, cb: C) where C: Fn(PulseAudioStream, size_t), C: Send {
+    pub fn set_read_callback<C>(&mut self, cb: C) where C: FnMut(PulseAudioStream, size_t), C: Send {
         let internal_guard = self.internal.lock();
         let mut internal = internal_guard.unwrap();
         internal.read_cb = Some(Box::new(cb) as BoxedPaStreamRequestCallback);
