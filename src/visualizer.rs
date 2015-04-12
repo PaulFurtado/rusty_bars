@@ -171,3 +171,6 @@ impl Drop for Visualizer {
         };
     }
 }
+
+
+unsafe impl Send for Visualizer {}
