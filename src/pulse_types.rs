@@ -324,9 +324,9 @@ pub mod structs {
     #[derive(Copy)]
     #[repr(C)]
     pub struct pa_sample_spec {
-      format: c_int,
-      rate: u32,
-      channels: u8
+      pub format: c_int,
+      pub rate: u32,
+      pub channels: u8
     }
 
     #[repr(C)]
