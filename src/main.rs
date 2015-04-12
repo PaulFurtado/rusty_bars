@@ -238,40 +238,10 @@ fn simple_run_analyzer(dev: &str) {
 
 
 
-/// Outputs an ncurses based spectrum analyzer over the given device
-fn run_analyzer(dev: &str) {
-    let sample_spec = pulse_types::structs::pa_sample_spec {
-        format: PA_SAMPLE_S16LE,
-        rate: 44100,
-        channels: 2
-    };
-
-    let mut vis = visualizer::Visualizer::new();
-    let width = vis.get_width();
-    let mut fft = fftw_wrapper::AudioFft::new(1024, 2);
-
-    let mainloop = pulse::PulseAudioMainloop::new();
-    let mut context = mainloop.create_context("rs_client");
-    let mut stream = context.create_stream("rs_client", &sample_spec, None);
-
-
-    stream.set_read_callback(move |mut stream, nbytes| {
-        //let foo: &[u8] = stream.peek().unwrap();
-        fft.feed_u8_data(stream.peek().unwrap());
-        fft.execute();
-        fft.compute_output();
-        vis.render_frame(fft.get_output()).unwrap();
-    });
-
-    context.connect(None, pulse::pa_context_flags::NOAUTOSPAWN);
-    stream.connect_record(None, None, None);
-    mainloop.run();
-}
-
-
 
 fn main() {
     use pulse::*;
+
 
 
     let mainloop = PulseAudioMainloop::new();
@@ -302,7 +272,34 @@ fn main() {
                                 println!("driver: {}", info.get_driver());
                                 println!("===================== end sink_info_callback =======================");
 
-                                simple_run_analyzer(info.get_monitor_source_name());
+
+                                let sample_spec = pulse_types::structs::pa_sample_spec {
+                                    format: PA_SAMPLE_S16LE,
+                                    rate: 44100,
+                                    channels: 2
+                                };
+
+
+                                let mut vis = visualizer::Visualizer::new();
+                                let width = vis.get_width();
+                                let mut fft = fftw_wrapper::AudioFft::new(1024, 2);
+
+                                let mut stream = context.create_stream("rs_client", &sample_spec, None);
+
+                                stream.set_read_callback(move |mut stream, nbytes| {
+                                    //let foo: &[u8] = stream.peek().unwrap();
+                                    fft.feed_u8_data(stream.peek().unwrap());
+                                    fft.execute();
+                                    fft.compute_output();
+                                    vis.render_frame(fft.get_output()).unwrap();
+                                });
+
+
+                                stream.connect_record(None, None, None);
+
+                                return;
+
+                                //simple_run_analyzer(info.get_monitor_source_name());
                                 return;
 
 
