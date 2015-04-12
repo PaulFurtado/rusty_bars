@@ -295,7 +295,7 @@ fn main() {
                                 });
 
 
-                                stream.connect_record(None, None, None);
+                                stream.connect_record(Some(info.get_monitor_source_name()), None, None);
 
                                 return;
 
