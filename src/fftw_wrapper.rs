@@ -73,6 +73,7 @@ impl FftwComplex {
     }
 }
 
+
 /// Wrapper around fftw_malloc which automatically allocates the right amount of
 /// space for Rust objects, similar to calloc.
 /// Returns None if allocation failed.
@@ -102,17 +103,17 @@ fn fftw_ralloc<T>(count: usize) -> Option<*mut T> {
 /// when it is dropped so stopping that would involve hacks.
 /// The FftAlignedArray struct doesn't implement any features a Vec does,
 /// instead, it just gives you back slices so you can do
-pub struct FftwAlignedArray<'a, T> {
+pub struct FftwAlignedArray<T> {
     len: usize,
     ptr: *const T,
     mut_ptr: *mut T,
 }
 
-impl<'a, T: Copy> FftwAlignedArray<'a, T> {
+impl<T: Copy> FftwAlignedArray<T> {
     /// Create a new FftwAlignedArray.
     /// Len is the number of elements, not the size in bytes.
     /// Panics if memory allocation fails.
-    fn new(len: usize) -> FftwAlignedArray<'a, T> {
+    fn new(len: usize) -> FftwAlignedArray<T> {
         let ptr: *mut T = fftw_ralloc::<T>(len).unwrap();
         FftwAlignedArray {
             len: len,
@@ -129,23 +130,23 @@ impl<'a, T: Copy> FftwAlignedArray<'a, T> {
     }
 
     /// Get an immutable raw pointer to the memory backing this array
-    fn as_ptr(&'a self) -> *const T {
+    fn as_ptr(&self) -> *const T {
         self.ptr
     }
 
     /// Get an mutable raw pointer to the memory backing this array
-    fn as_mut_ptr(&'a self) -> *mut T {
+    fn as_mut_ptr(&self) -> *mut T {
         self.mut_ptr
     }
 
     /// Modify the contents of this array via a mutable slice
-    fn as_mut_slice(&'a mut self) -> &'a mut [T] {
+    fn as_mut_slice<'a>(&'a mut self) -> &'a mut [T] {
         unsafe{ slice::from_raw_mut_buf(&self.mut_ptr, self.len) }
     }
 }
 
 
-impl<'a, T> AsSlice<T> for FftwAlignedArray<'a, T> {
+impl<T> AsSlice<T> for FftwAlignedArray<T> {
     /// Access the contents of this array via an immutable slice
     fn as_slice(&self) -> &[T] {
         unsafe{ slice::from_raw_buf(&self.ptr, self.len) }
@@ -155,7 +156,7 @@ impl<'a, T> AsSlice<T> for FftwAlignedArray<'a, T> {
 
 #[unsafe_destructor]
 /// Unsafe because it has lifetimes.
-impl<'a, T> Drop for FftwAlignedArray<'a, T> {
+impl<T> Drop for FftwAlignedArray<T> {
     /// Free the array with the right deallocator
     fn drop(&mut self) {
         unsafe{ ext::fftw_free(self.mut_ptr as *mut c_void) };
@@ -164,17 +165,17 @@ impl<'a, T> Drop for FftwAlignedArray<'a, T> {
 
 
 /// Rust wrapper for an FFTW plan
-pub struct FftwPlan<'a> {
-    input: FftwAlignedArray<'a, f64>,
-    output: FftwAlignedArray<'a, FftwComplex>,
+pub struct FftwPlan {
+    input: FftwAlignedArray<f64>,
+    output: FftwAlignedArray<FftwComplex>,
     size: usize,
     plan: *mut ext::fftw_plan,
 }
 
 
-impl<'a> FftwPlan<'a> {
+impl FftwPlan {
     /// Create a new wrapper around an FFTW plan
-    pub fn new(size: usize) -> FftwPlan<'a> {
+    pub fn new(size: usize) -> FftwPlan {
         if !is_power_of_two(size) {
             panic!("FFT size should be a power of two!");
         }
@@ -207,12 +208,12 @@ impl<'a> FftwPlan<'a> {
     }
 
     /// Get a slice of the FFTW plan's input buffer
-    pub fn get_input_slice(&'a mut self) -> &'a mut [f64] {
+    pub fn get_input_slice<'a>(&'a mut self) -> &'a mut [f64] {
         self.input.as_mut_slice()
     }
 
     /// Get a slice of the FFTW plan's output buffer
-    pub fn get_output_slice(&'a self) -> &'a [FftwComplex] {
+    pub fn get_output_slice<'a>(&'a self) -> &'a [FftwComplex] {
         // A real FFT outputs half of the input size.
         self.output.as_slice().slice_to(self.size/2)
     }
@@ -220,7 +221,7 @@ impl<'a> FftwPlan<'a> {
 
 #[unsafe_destructor]
 /// Unsafe because it has lifetimes.
-impl<'a> Drop for FftwPlan<'a> {
+impl Drop for FftwPlan {
     /// Runds fftw_destroy plan when a plan goes out of scope
     fn drop(&mut self) {
         unsafe { ext::fftw_destroy_plan(self.plan); }
@@ -230,19 +231,19 @@ impl<'a> Drop for FftwPlan<'a> {
 
 
 /// An FFT for multiple channels of data.
-pub struct MultiChannelFft<'a> {
+pub struct MultiChannelFft {
     /// The size of the FFTs to be run
     size: usize,
     /// The number of channels
     channel_count: usize,
     /// The plans for each channel
-    channel_plans: Vec<FftwPlan<'a>>
+    channel_plans: Vec<FftwPlan>
 }
 
 
-impl<'a> MultiChannelFft<'a> {
+impl MultiChannelFft {
     //// Create and initialize a new MultiChannelFft
-    fn new(size: usize, channel_count: usize) -> MultiChannelFft<'a> {
+    fn new(size: usize, channel_count: usize) -> MultiChannelFft {
         let mut channel_plans: Vec<FftwPlan> = Vec::with_capacity(channel_count);
 
         for _ in (0..channel_count) {
@@ -258,12 +259,12 @@ impl<'a> MultiChannelFft<'a> {
     }
 
     /// Return a borrowed reference to the plan for a channel
-    fn get_channel(&'a self, index: usize) -> Option<&'a FftwPlan> {
+    fn get_channel<'a>(&'a self, index: usize) -> Option<&'a FftwPlan> {
         self.channel_plans.get(index)
     }
 
     /// Return a mutable borrowed reference to the plan for a channel
-    fn get_channel_mut(&'a mut self, index: usize) -> Option<&'a mut FftwPlan> {
+    fn get_channel_mut<'a>(&'a mut self, index: usize) -> Option<&'a mut FftwPlan> {
         self.channel_plans.get_mut(index)
     }
 
@@ -314,9 +315,9 @@ impl HanningWindowCalculator {
 
 
 /// Audio FFT for 16bit little endian audio data (S16LE)
-pub struct AudioFft<'a> {
+pub struct AudioFft {
     /// The multichannel fft object that does the work for us
-    multichan_fft: MultiChannelFft<'a>,
+    multichan_fft: MultiChannelFft,
     /// The input cursor indicates how much data has been read in. Input is
     /// 16bit integers, inerleaved by channels. The so that means the maximum
     /// value of input_cursor is channel_count * fft_size
@@ -332,9 +333,9 @@ pub struct AudioFft<'a> {
 }
 
 
-impl<'a> AudioFft<'a> {
+impl AudioFft {
     /// Create a new AudioFft
-    pub fn new(fft_size: usize, channel_count: usize) -> AudioFft<'a> {
+    pub fn new(fft_size: usize, channel_count: usize) -> AudioFft {
         let mut out_vec = Vec::with_capacity(fft_size/2);
         for _ in (0..fft_size/2) {
             out_vec.push(0.0);
@@ -414,7 +415,7 @@ impl<'a> AudioFft<'a> {
     }
 }
 
-
+unsafe impl Send for AudioFft {}
 
 
 #[test]
