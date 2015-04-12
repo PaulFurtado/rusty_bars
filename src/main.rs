@@ -240,8 +240,7 @@ fn simple_run_analyzer(dev: &str) {
 
 /// Outputs an ncurses based spectrum analyzer over the given device
 fn run_analyzer(dev: &str) {
-    // The sample spec to record from pulseaudio at
-    let sample_spec = PulseSampleSpec{
+    let sample_spec = pulse_types::structs::pa_sample_spec {
         format: PA_SAMPLE_S16LE,
         rate: 44100,
         channels: 2
@@ -249,42 +248,22 @@ fn run_analyzer(dev: &str) {
 
     let mut vis = visualizer::Visualizer::new();
     let width = vis.get_width();
-    // TODO: compute_input_size is totally broken.
-    let fft_size = analyze_spectrum::compute_input_size(max(width, 512));
+    let mut fft = fftw_wrapper::AudioFft::new(1024, 2);
 
-    // Initialize the FFT first so that we don't hold up pulseaudio while
-    // waiting for the FFT planner
-    let mut fft = analyze_spectrum::AudioFFT::new(fft_size, 2);
-
-    // Initialize the buffer we use for reading from pulse audio
-    let mut buffer_vec: Vec<u8> = Vec::with_capacity(fft.get_buf_size());
-    for _ in range(0, fft.get_buf_size()) {
-        buffer_vec.push(0);
-    }
-    let mut buffer = buffer_vec.as_mut_slice();
-
-    // Initialize pulseaudio
-    // let mut pulse = PulseSimple::new(dev, StreamDirection::StreamRecord, &sample_spec).unwrap();
     let mainloop = pulse::PulseAudioMainloop::new();
     let mut context = mainloop.create_context("rs_client");
+    let mut stream = context.create_stream("rs_client", &sample_spec, None);
 
-    // TODO: turn this into a read callback
-    /*
-    loop {
-        pulse.read(buffer).unwrap();
-        let output = fft.execute(buffer);
-        //println!("sup");
-        match vis.render_frame(output) {
-            Err(x) => panic!("error: {}", x),
-            Ok(_) => {}
-        }
-        // Commented out code below is for pumping the data to a client
-        //let temp: Vec<String> = output.iter().map(|x| format!("{}", x)).collect();
-        //println!("{}", temp.connect(", "));
-    }
-     */
+    stream.set_read_callback(move |mut stream, nbytes| {
+        let foo: &[u8] = stream.peek().unwrap();
+        fft.feed_u8_data(stream.peek().unwrap());
+        fft.execute();
+        fft.compute_output();
+        vis.render_frame(fft.get_output()).unwrap();
+    });
 
     context.connect(None, pulse::pa_context_flags::NOAUTOSPAWN);
+    stream.connect_record(None, None, None);
     mainloop.run();
 }
 
