@@ -333,13 +333,4 @@ fn main() {
     context.connect(None, pa_context_flags::NOAUTOSPAWN);
     mainloop.run();
 
-    let args = os::args();
-    if args.len() != 2 {
-        panic!("
-            I need a device.
-            Ex: <binary_name> <device_name>.monitor
-        ");
-    }
-
-    run_analyzer(args[1].as_slice());
 }

@@ -17,11 +17,11 @@ use std::io::{Reader, Writer, IoResult, IoError, IoErrorKind};
 
 
 // Types for callback closures
-type StateCallback = Fn(Context, pa_context_state) + Send;
-type ServerInfoCallback = Fn(Context, &pa_server_info) + Send;
-type SinkInfoCallback = Fn(Context, Option<&pa_sink_info>) + Send;
-type SubscriptionCallback = Fn(Context, c_int, u32) + Send;
-type PaContextSuccessCallback = Fn(Context, bool) + Send;
+type StateCallback = FnMut(Context, pa_context_state) + Send;
+type ServerInfoCallback = FnMut(Context, &pa_server_info) + Send;
+type SinkInfoCallback = FnMut(Context, Option<&pa_sink_info>) + Send;
+type SubscriptionCallback = FnMut(Context, c_int, u32) + Send;
+type PaContextSuccessCallback = FnMut(Context, bool) + Send;
 type PaStreamRequestCallback = FnMut(PulseAudioStream, size_t) + Send; // XXX
 
 
@@ -144,7 +144,7 @@ impl Context {
 
     /// Set the callback for server state. This callback gets called many times.
     /// Do not start sending commands until this returns pa_context_state::READY
-    pub fn set_state_callback<C>(&mut self, cb: C) where C: Fn(Context, pa_context_state) + Send {
+    pub fn set_state_callback<C>(&mut self, cb: C) where C: FnMut(Context, pa_context_state) + Send {
         let internal_guard = self.internal.lock();
         let mut internal = internal_guard.unwrap();
         internal.state_cb = Some(Box::new(cb) as BoxedStateCallback);
@@ -164,7 +164,7 @@ impl Context {
 
     /// Gets basic information about the server. See the pa_server_info struct
     /// for more details.
-    pub fn get_server_info<C>(&self, cb: C) where C: Fn(Context, &pa_server_info), C: Send {
+    pub fn get_server_info<C>(&self, cb: C) where C: FnMut(Context, &pa_server_info), C: Send {
         let internal_guard = self.internal.lock();
         let mut internal = internal_guard.unwrap();
         internal.server_info_cb = Some(Box::new(cb) as BoxedServerInfoCallback);
@@ -177,7 +177,7 @@ impl Context {
     /// element list. You should get two callbacks from this function: one with
     /// the information about the sink, and one with None indicating the end of
     /// the list.
-    pub fn get_sink_info_by_name<C>(&self, name: &str, cb: C) where C: Fn(Context, Option<&pa_sink_info>), C: Send {
+    pub fn get_sink_info_by_name<C>(&self, name: &str, cb: C) where C: FnMut(Context, Option<&pa_sink_info>), C: Send {
         let internal_guard = self.internal.lock();
         let mut internal = internal_guard.unwrap();
         internal.sink_info_cb = Some(Box::new(cb) as BoxedSinkInfoCallback);
@@ -185,7 +185,7 @@ impl Context {
     }
 
     /// Adds an event subscription
-    pub fn add_subscription<C>(&self, mask: pa_subscription_mask, cb: C) where C: Fn(Context, bool), C: Send {
+    pub fn add_subscription<C>(&self, mask: pa_subscription_mask, cb: C) where C: FnMut(Context, bool), C: Send {
         let internal_guard = self.internal.lock();
         let mut internal = internal_guard.unwrap();
         internal.context_success_cb = Some(Box::new(cb) as BoxedPaContextSuccessCallback);
@@ -195,7 +195,7 @@ impl Context {
     }
 
     /// Removes an event subscription
-    pub fn remove_subscription<C>(&self, mask: pa_subscription_mask, cb: C) where C: Fn(Context, bool), C: Send {
+    pub fn remove_subscription<C>(&self, mask: pa_subscription_mask, cb: C) where C: FnMut(Context, bool), C: Send {
         let internal_guard = self.internal.lock();
         let mut internal = internal_guard.unwrap();
         internal.context_success_cb = Some(Box::new(cb) as BoxedPaContextSuccessCallback);
@@ -205,7 +205,7 @@ impl Context {
     }
 
     /// Sets the callback for subscriptions
-    pub fn set_event_callback<C>(&self, cb: C) where C: Fn(Context, c_int, u32), C: Send {
+    pub fn set_event_callback<C>(&self, cb: C) where C: FnMut(Context, c_int, u32), C: Send {
         let internal_guard = self.internal.lock();
         let mut internal = internal_guard.unwrap();
         internal.event_cb = Some(Box::new(cb) as BoxedSubscriptionCallback);
@@ -301,45 +301,45 @@ impl ContextInternal {
     }
 
     /// Called back for state changes. Wraps the user's closure
-    fn state_callback(&self) {
+    fn state_callback(&mut self) {
         let state = self.get_state();
         let external = self.external.clone().unwrap();
         match self.state_cb {
-            Some(ref cb) => cb(external, state),
+            Some(ref mut cb) => cb(external, state),
             None => println!("warning: no context state callback set")
         }
     }
 
     /// Called back for get_server_info. Wraps the user's closure
-    fn server_info_callback(&self, info: &pa_server_info) {
+    fn server_info_callback(&mut self, info: &pa_server_info) {
         let external = self.external.clone().unwrap();
         match self.server_info_cb {
-            Some(ref cb) => cb(external, info),
+            Some(ref mut cb) => cb(external, info),
             None => println!("warning: no server info callback is set"),
         }
     }
 
     /// Called back for the sink_info_list and get_sink_info commands
-    fn sink_info_callback(&self, info: Option<&pa_sink_info>) {
+    fn sink_info_callback(&mut self, info: Option<&pa_sink_info>) {
         let external = self.external.clone().unwrap();
         match self.sink_info_cb {
-            Some(ref cb) => cb(external, info),
+            Some(ref mut cb) => cb(external, info),
             None => println!("warning: no sink info callback is set"),
         }
     }
 
-    fn event_callback(&self, t: c_int, idx: u32) {
+    fn event_callback(&mut self, t: c_int, idx: u32) {
         let external = self.external.clone().unwrap();
         match self.event_cb {
-            Some(ref cb) => cb(external, t, idx),
+            Some(ref mut cb) => cb(external, t, idx),
             None => println!("warning: no event callback is set")
         }
     }
 
-    fn subscription_success_callback(&self, success: bool) {
+    fn subscription_success_callback(&mut self, success: bool) {
         let external = self.external.clone().unwrap();
         match self.context_success_cb {
-            Some(ref cb) => cb(external, success),
+            Some(ref mut cb) => cb(external, success),
             None => println!("warning: no success callback is set"),
         }
     }
@@ -386,20 +386,20 @@ impl SubscriptionManager {
 /// State callback for C to call. Takes a ContextInternal and calls its
 /// server_info_callback method.
 extern fn _state_callback(_: *mut pa_context, context: *mut c_void) {
-    let context_internal = unsafe{ &* (context as *mut ContextInternal) };
+    let context_internal = unsafe{ &mut * (context as *mut ContextInternal) };
     context_internal.state_callback();
 }
 
 /// Server info callback for C to call. Takes a ContextInternal and calls its
 /// server_info_callback method.
 extern fn _server_info_callback(_: *mut pa_context, info: *const pa_server_info, context: *mut c_void) {
-    let context_internal = unsafe{ &* (context as *mut ContextInternal) };
+    let context_internal = unsafe{ &mut * (context as *mut ContextInternal) };
     context_internal.server_info_callback(unsafe{ &*info });
 }
 
 /// Sink info callback for C to call.
 extern fn _sink_info_callback(_: *mut pa_context, info: *const pa_sink_info, eol: c_int, context: *mut c_void) {
-    let context_internal = unsafe{ &* (context as *mut ContextInternal) };
+    let context_internal = unsafe{ &mut * (context as *mut ContextInternal) };
     if eol == 1 || info.is_null() {
         context_internal.sink_info_callback(None);
     } else {
@@ -409,13 +409,13 @@ extern fn _sink_info_callback(_: *mut pa_context, info: *const pa_sink_info, eol
 
 /// Subscription callback for C to call.
 extern fn _subscription_event_callback(_: *mut pa_context, t: c_int, idx: u32, context: *mut c_void) {
-    let context_internal = unsafe{ &* (context as *mut ContextInternal) };
+    let context_internal = unsafe{ &mut * (context as *mut ContextInternal) };
     context_internal.event_callback(t, idx);
 }
 
 /// Called back to tell you if a subscription succeded or failed.
 extern fn _subscription_success_callback(_: *mut pa_context, success: c_int,  context: *mut c_void) {
-    let context_internal = unsafe{ &* (context as *mut ContextInternal) };
+    let context_internal = unsafe{ &mut * (context as *mut ContextInternal) };
     context_internal.subscription_success_callback(success==1);
 }
 
