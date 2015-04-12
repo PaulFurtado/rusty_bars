@@ -256,11 +256,11 @@ fn run_analyzer(dev: &str) {
 
 
     stream.set_read_callback(move |mut stream, nbytes| {
-        let foo: &[u8] = stream.peek().unwrap();
-        //fft.feed_u8_data(stream.peek().unwrap());
-        //fft.execute();
-        //fft.compute_output();
-        //vis.render_frame(fft.get_output()).unwrap();
+        //let foo: &[u8] = stream.peek().unwrap();
+        fft.feed_u8_data(stream.peek().unwrap());
+        fft.execute();
+        fft.compute_output();
+        vis.render_frame(fft.get_output()).unwrap();
     });
 
     context.connect(None, pulse::pa_context_flags::NOAUTOSPAWN);
