@@ -7,10 +7,11 @@ use self::libc::{c_int, size_t};
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use rust_pulse::fftw_wrapper;
+use rust_pulse::fftw::audio::AudioFft;
 use rust_pulse::pulse::{Context, PulseAudioMainloop, PulseAudioStream};
 use rust_pulse::pulse::types::*;
 use rust_pulse::visualizer;
+
 
 macro_rules! println_stderr(
     ($($arg:tt)*) => (
@@ -57,7 +58,7 @@ impl<'a> VizRunner<'a> {
 
 struct VizRunnerInternal<'a> {
     context: Context<'a>,
-    fft: fftw_wrapper::AudioFft,
+    fft: AudioFft,
     viz: visualizer::Visualizer,
     external: Option<VizRunner<'a>>,
     stream: Option<PulseAudioStream<'a>>,
@@ -70,7 +71,7 @@ impl<'a> VizRunnerInternal<'a> {
         let context = mainloop.create_context("rs_client");
         VizRunnerInternal {
             context: context,
-            fft: fftw_wrapper::AudioFft::new(1024, 2),
+            fft: AudioFft::new(1024, 2),
             viz: visualizer::Visualizer::new(),
             external: None,
             stream: None
