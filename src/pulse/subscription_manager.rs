@@ -4,27 +4,16 @@
 
 extern crate libc;
 
-use self::libc::funcs::c95::string::strlen;
-use self::libc::{c_int, c_char, c_void};
-
-use std::cell::RefCell;
-use std::ffi::CString;
-use std::ptr;
-use std::rc::Rc;
-
-use pulse::ext;
-use pulse::mainloop::PulseAudioMainloop;
-use pulse::stream::PulseAudioStream;
-use pulse::types::*;
+use self::libc::c_int;
+use pulse::types::pa_subscription_mask;
 
 
-
-/// Represents subscribed events on a Context.
-/// An event type needs a subscription before its callback is triggered.
+/// Helper for managing the subscription mask for subscribed events.
+/// PulseAudio uses the pa_subscription_mask enum to store each subscription
+/// event type. This struct helps manage the combined mask of subscriptions.
 pub struct SubscriptionManager {
     mask: c_int,
 }
-
 
 impl SubscriptionManager {
     /// Create a new SubscriptionManager
