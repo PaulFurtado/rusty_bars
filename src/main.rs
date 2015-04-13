@@ -4,13 +4,15 @@ extern crate libc;
 extern crate rust_pulse;
 
 use self::libc::{c_int, size_t};
-use rust_pulse::pulse::*;
-use rust_pulse::pulse_types::*;
-use rust_pulse::visualizer;
-use rust_pulse::fftw_wrapper;
-use rust_pulse::stream::PulseAudioStream;
 use std::rc::Rc;
 use std::cell::RefCell;
+
+use rust_pulse::fftw_wrapper;
+use rust_pulse::pulse::context::Context;
+use rust_pulse::pulse::mainloop::PulseAudioMainloop;
+use rust_pulse::pulse::stream::PulseAudioStream;
+use rust_pulse::pulse::types::*;
+use rust_pulse::visualizer;
 
 macro_rules! println_stderr(
     ($($arg:tt)*) => (

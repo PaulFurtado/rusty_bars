@@ -14,8 +14,9 @@ use std::rc::Rc;
 
 use pulse::ext;
 use pulse::mainloop::PulseAudioMainloop;
-pub use pulse::stream::PulseAudioStream;
+use pulse::stream::PulseAudioStream;
 use pulse::types::*;
+use pulse::subscription_manager::SubscriptionManager;
 
 
 /// Types for callback closures
@@ -27,7 +28,8 @@ type PaContextSuccessCallback<'a> = FnMut(Context, bool) + 'a;
 
 
 /// Boxed types for callback closures.
-type BoxedStateCallback<'a> = Box<StateCallback<'a>>;
+type
+ BoxedStateCallback<'a> = Box<StateCallback<'a>>;
 type BoxedServerInfoCallback<'a> = Box<ServerInfoCallback<'a>>;
 type BoxedSinkInfoCallback<'a> = Box<SinkInfoCallback<'a>>;
 type BoxedSubscriptionCallback<'a> = Box<SubscriptionCallback<'a>>;
@@ -342,12 +344,14 @@ extern fn _state_callback(_: *mut pa_context, context: *mut c_void) {
     context_internal.state_callback();
 }
 
+
 /// Server info callback for C to call. Takes a ContextInternal and calls its
 /// server_info_callback method.
 extern fn _server_info_callback(_: *mut pa_context, info: *const pa_server_info, context: *mut c_void) {
     let context_internal = unsafe{ &mut * (context as *mut ContextInternal) };
     context_internal.server_info_callback(unsafe{ &*info });
 }
+
 
 /// Sink info callback for C to call.
 extern fn _sink_info_callback(_: *mut pa_context, info: *const pa_sink_info, eol: c_int, context: *mut c_void) {
@@ -359,14 +363,37 @@ extern fn _sink_info_callback(_: *mut pa_context, info: *const pa_sink_info, eol
     }
 }
 
+
 /// Subscription callback for C to call.
 extern fn _subscription_event_callback(_: *mut pa_context, t: c_int, idx: u32, context: *mut c_void) {
     let context_internal = unsafe{ &mut * (context as *mut ContextInternal) };
     context_internal.event_callback(t, idx);
 }
 
+
 /// Called back to tell you if a subscription succeded or failed.
 extern fn _subscription_success_callback(_: *mut pa_context, success: c_int,  context: *mut c_void) {
     let context_internal = unsafe{ &mut * (context as *mut ContextInternal) };
     context_internal.subscription_success_callback(success==1);
+}
+
+
+/// A rust wrapper around pa_context_get_state
+pub fn pa_context_get_state(context: *mut opaque::pa_context) -> enums::pa_context_state {
+    assert!(!context.is_null());
+    unsafe{ ext::pa_context_get_state(context) }
+}
+
+
+/// A rust wrapper around pa_context_get_sink_info_list
+pub fn pa_context_get_sink_info_list(context: *mut opaque::pa_context,
+    callback: cb::pa_sink_info_cb_t, userdata: *mut c_void) -> Option<*mut opaque::pa_operation> {
+
+    assert!(!context.is_null());
+    let result = unsafe{ ext::pa_context_get_sink_info_list(context, callback, userdata) };
+    if result.is_null() {
+        None
+    } else {
+        Some(result)
+    }
 }

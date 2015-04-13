@@ -1,13 +1,34 @@
+#![allow(unstable)]
+
+/// A module for subscribing to events on a PulseAudio server.
+
+extern crate libc;
+
+use self::libc::funcs::c95::string::strlen;
+use self::libc::{c_int, c_char, c_void};
+
+use std::cell::RefCell;
+use std::ffi::CString;
+use std::ptr;
+use std::rc::Rc;
+
+use pulse::ext;
+use pulse::mainloop::PulseAudioMainloop;
+use pulse::stream::PulseAudioStream;
+use pulse::types::*;
+
+
+
 /// Represents subscribed events on a Context.
 /// An event type needs a subscription before its callback is triggered.
-struct SubscriptionManager {
+pub struct SubscriptionManager {
     mask: c_int,
 }
 
 
 impl SubscriptionManager {
     /// Create a new SubscriptionManager
-    fn new() -> SubscriptionManager {
+    pub fn new() -> SubscriptionManager {
         SubscriptionManager {
             mask: 0,
         }
