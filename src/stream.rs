@@ -4,9 +4,9 @@ extern crate libc;
 
 use self::libc::{c_int, c_char, c_void, size_t};
 
-use std::{ptr, mem, fmt, slice};
+use std::{ptr, mem, slice};
 use std::ffi::CString;
-use std::io::{IoResult, IoError, IoErrorKind};
+use std::io::IoResult;
 use std::sync::{Arc, Mutex};
 
 use pulse_types::*;
@@ -159,6 +159,18 @@ impl Drop for PulseAudioStreamInternal {
 }
 
 
+/// Represents errors that could occur while reading data from a
+/// PulseAudioStream.
+#[derive(Copy, PartialEq, Eq, Clone, Show)]
+pub enum PeekError {
+    /// The input buffer is empty.
+    BufferEmpty,
+    /// The input buffer contained a hole. The current fragment should be
+    /// dropped using drop_fragment.
+    HoleInInputBuffer(usize)
+}
+
+
 /// Represents a Pulse Audio stream.
 /// Can be used to write to a sink or read from a source.
 #[derive(Clone)]
@@ -199,7 +211,7 @@ impl PulseAudioStream {
 
     /// Return the current fragment from Pulse's record stream.
     /// To return the next fragment, drop_fragment must be called after peeking.
-    pub fn peek(&mut self) -> IoResult<&[u8]> {
+    pub fn peek(&mut self) -> Result<&[u8], PeekError> {
         let internal_guard = self.internal.lock();
         let internal = internal_guard.unwrap();
 
@@ -212,17 +224,9 @@ impl PulseAudioStream {
 
         if buf.is_null() {
             if nbytes == 0 {
-                return Err(IoError {
-                    kind: IoErrorKind::NoProgress,
-                    desc: "Buffer is empty",
-                    detail: None
-                });
+                return Err(PeekError::BufferEmpty);
             } else {
-                return Err(IoError {
-                    kind: IoErrorKind::OtherIoError,
-                    desc: "Hole in input buffer",
-                    detail: Some(fmt::format(format_args!("hole of size {}", nbytes))),
-                });
+                return Err(PeekError::HoleInInputBuffer(nbytes as usize));
             }
         }
 
@@ -231,6 +235,7 @@ impl PulseAudioStream {
             Ok(slice::from_raw_buf(&self._last_ptr, nbytes as usize))
         }
     }
+
 
     /// Drops the current fragment in Pulse's record stream.
     /// Can only be called after peek.
