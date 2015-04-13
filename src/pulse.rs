@@ -573,12 +573,17 @@ fn pa_stream_connect_record(
 
     let dev: *const c_char = match source_name {
         None => ptr::null(),
-        Some(name) => CString::from_slice(name.as_bytes()).as_ptr()
+        Some(name) => {
+            let cstr = CString::from_slice(name.as_bytes());
+            let cstr_ptr = cstr.as_ptr();
+            unsafe{ mem::forget(cstr) };
+            cstr_ptr
+        }
     };
 
     let attr: *const pa_buffer_attr = match buffer_attributes {
         None => ptr::null(),
-        Some(attributes) => attributes as *const pa_buffer_attr
+        Some(attributes) => attributes
     };
 
     let flags: pa_stream_flags_t = match stream_flags {
@@ -751,6 +756,9 @@ impl PulseAudioStream {
         source_name: Option<&str>,
         buffer_attributes: Option<&pa_buffer_attr>,
         stream_flags: Option<pa_stream_flags_t>) -> Result<c_int, String> {
+
+        println!("connect record");
+
         let internal_guard = self.internal.lock();
         let mut internal = internal_guard.unwrap();
 
