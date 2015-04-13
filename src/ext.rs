@@ -45,6 +45,8 @@ extern {
     ) -> *mut pa_operation;
 
     pub fn pa_context_connect(
+
+
         context: *mut opaque::pa_context,
         server: *const c_char,
         flags: enums::pa_context_flags,

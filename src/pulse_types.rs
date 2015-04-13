@@ -1,6 +1,5 @@
 #![allow(unstable)]
 #![allow(non_camel_case_types)]
-#![allow(dead_code)]
 #![allow(raw_pointer_derive)]
 
 
@@ -17,7 +16,6 @@ pub mod cb {
     use self::libc::{c_int, c_void, size_t};
     use super::opaque::*;
     use super::structs::*;
-    use super::enums::*;
 
     pub type pa_context_notify_cb_t = extern "C" fn(
         *mut pa_context,

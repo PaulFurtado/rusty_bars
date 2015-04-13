@@ -9,11 +9,10 @@ use ext;
 
 
 use std::ffi::CString;
-use std::ptr;
-
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
+use std::ptr;
 
 use pulse_types::*;
 pub use stream;

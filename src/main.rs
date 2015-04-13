@@ -131,8 +131,6 @@ impl<'a> VizRunnerInternal<'a> {
         println!("got data");
 
     }
-
-
 }
 
 
