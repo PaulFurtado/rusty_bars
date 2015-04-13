@@ -569,6 +569,8 @@ fn pa_stream_connect_record(
     buffer_attributes: Option<&pa_buffer_attr>,
     stream_flags: Option<pa_stream_flags_t>) -> Result<c_int, String> {
 
+    assert!(!stream.is_null());
+
     let dev: *const c_char = match source_name {
         None => ptr::null(),
         Some(name) => CString::from_slice(name.as_bytes()).as_ptr()
@@ -584,10 +586,16 @@ fn pa_stream_connect_record(
         Some(stream_flags) => stream_flags
     };
 
-    unsafe {
-        Ok(ext::stream::pa_stream_connect_record(
-            &mut pa_stream as *mut opaque::pa_stream, dev, attr, flags))
+    let res = unsafe {
+        ext::stream::pa_stream_connect_record(stream, dev, attr, flags)
+    };
+
+    if res < 0 {
+        Err("unknown error".to_string())
+    } else {
+        Ok(res)
     }
+
 }
 
 
@@ -666,12 +674,19 @@ impl PulseAudioStream {
     ///     map: the channel map for this stream
     pub fn new(context: *mut pa_context, name: &str, ss: *const pa_sample_spec,
         map: *const pa_channel_map) -> Self {
-        let internal = PulseAudioStreamInternal::new(
-            pa_stream_new(context, name, ss, map));
+
+        let stream = pa_stream_new(context, name, ss, map);
+        println!("um");
+
+
+        let internal = PulseAudioStreamInternal::new(stream);
+
+
         let stream = PulseAudioStream {
             internal: Arc::new(Mutex::new(internal)),
             _last_ptr: ptr::null()
         };
+
         {
             let internal_guard = stream.internal.lock();
             let mut internal = internal_guard.unwrap();
@@ -776,6 +791,7 @@ impl PulseAudioStream {
 
 impl Drop for PulseAudioStream {
     fn drop(&mut self) {
+        println!("stream drop");
         self.disconnect()
     }
 }
