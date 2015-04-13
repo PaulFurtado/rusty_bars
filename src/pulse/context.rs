@@ -4,7 +4,6 @@
 
 extern crate libc;
 
-use self::libc::funcs::c95::string::strlen;
 use self::libc::{c_int, c_char, c_void};
 
 use std::cell::RefCell;

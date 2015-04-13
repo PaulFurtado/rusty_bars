@@ -4,19 +4,11 @@
 
 extern crate libc;
 
-use self::libc::funcs::c95::string::strlen;
-use self::libc::{c_int, c_char, c_void};
-
-use std::cell::RefCell;
-use std::ffi::CString;
-use std::ptr;
-use std::rc::Rc;
+use self::libc::c_int;
 
 use pulse::ext;
 use pulse::types::*;
-use pulse::stream::PulseAudioStream;
 use pulse::context::Context;
-
 
 /// A struct which wraps the PulseAudio async main loop.
 pub struct PulseAudioMainloop<'a> {
