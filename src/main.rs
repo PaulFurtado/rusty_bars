@@ -55,15 +55,11 @@ fn main() {
                                 println!("driver: {}", info.get_driver());
                                 println!("===================== end sink_info_callback =======================");
 
-                                //simple_run_analyzer(info.get_monitor_source_name());
-                                //return;
-
                                 let sample_spec = pa_sample_spec {
                                     format:pa_sample_format::PA_SAMPLE_S16LE,
                                     rate: 44100,
                                     channels: 2
                                 };
-
 
                                 let mut vis = visualizer::Visualizer::new();
                                 let mut fft = fftw_wrapper::AudioFft::new(1024, 2);
@@ -124,5 +120,4 @@ fn main() {
     });
     context.connect(None, pa_context_flags::NOAUTOSPAWN);
     mainloop.run();
-
 }
