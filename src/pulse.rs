@@ -258,7 +258,7 @@ struct ContextInternal {
 /// game plan here.
 impl Drop for ContextInternal {
     fn drop(&mut self) {
-        println!("drop internal");
+        println!("drop ContextInternal");
     }
 }
 
@@ -424,7 +424,6 @@ extern fn _subscription_success_callback(_: *mut pa_context, success: c_int,  co
 /// audio data available to read.
 extern fn _pa_stream_read_callback(
     _: *mut opaque::pa_stream, nbytes: size_t,  userdata: *mut c_void) {
-    println!("this part gets called");
 
     let stream_internal = unsafe{ &mut * (
         userdata as *mut PulseAudioStreamInternal) };
@@ -681,8 +680,6 @@ impl PulseAudioStream {
         map: *const pa_channel_map) -> Self {
 
         let stream = pa_stream_new(context, name, ss, map);
-        println!("um");
-
 
         let internal = PulseAudioStreamInternal::new(stream);
 
@@ -760,8 +757,6 @@ impl PulseAudioStream {
         buffer_attributes: Option<&pa_buffer_attr>,
         stream_flags: Option<pa_stream_flags_t>) -> Result<c_int, String> {
 
-        println!("connect record");
-
         let internal_guard = self.internal.lock();
         let mut internal = internal_guard.unwrap();
 
@@ -802,7 +797,7 @@ impl PulseAudioStream {
 
 impl Drop for PulseAudioStream {
     fn drop(&mut self) {
-        println!("stream drop");
+        // TODO
         //self.disconnect()
     }
 }
