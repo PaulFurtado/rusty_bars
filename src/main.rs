@@ -1,5 +1,4 @@
 #![allow(unstable)]
-#![feature(unsafe_destructor)]
 
 // TODO: Automatically get default sink
 
@@ -20,6 +19,7 @@ use rust_pulse::stream::*;
 use rust_pulse::pulse_types::*;
 use rust_pulse::visualizer;
 use rust_pulse::fftw_wrapper;
+
 
 macro_rules! println_stderr(
     ($($arg:tt)*) => (
