@@ -24,9 +24,9 @@ const INIT_CHAR: c_char = '#' as c_char;
 
 
 /// Scales down a vector by averaging the elements between the resulting points
-pub fn scale_fft_output(input: &Vec<f64>, new_len: usize) -> Vec<f64> {
+pub fn scale_fft_output(input: &[f64], new_len: usize) -> Vec<f64> {
     if new_len >= input.len() {
-        return input.clone();
+        return input.to_vec();
     }
 
     let band_size: usize = input.len() / new_len;
@@ -160,7 +160,7 @@ impl Visualizer {
     }
 
     /// Render a single frame of the animation
-    pub fn render_frame(&mut self, data: &Vec<f64>) -> Result<(), c_int> {
+    pub fn render_frame(&mut self, data: &[f64]) -> Result<(), c_int> {
         self.update_size();
 
         let data = scale_fft_output(data, self.width as usize);

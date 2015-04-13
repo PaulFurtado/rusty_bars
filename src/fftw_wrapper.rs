@@ -217,7 +217,6 @@ impl FftwPlan {
     }
 }
 
-#[unsafe_destructor]
 /// Unsafe because it has lifetimes.
 impl Drop for FftwPlan {
     /// Runds fftw_destroy plan when a plan goes out of scope
@@ -273,6 +272,15 @@ impl MultiChannelFft {
         }
     }
 
+    /// Gets a vector of all of the input slices
+    fn get_inputs<'a>(&'a mut self) -> Vec<&'a mut [f64]> {
+        let mut inputs: Vec<&mut [f64]> = Vec::with_capacity(self.channel_count);
+        for channel in self.channel_plans.iter_mut() {
+            inputs.push(channel.get_input_slice());
+        }
+        inputs
+    }
+
 }
 
 /// Determine if a number is a power of two
@@ -320,6 +328,9 @@ pub struct AudioFft {
     /// 16bit integers, inerleaved by channels. The so that means the maximum
     /// value of input_cursor is channel_count * fft_size
     input_cursor: usize,
+    /// The number of elements needed to fill an FFT. This is equal to the size
+    /// of the FFT times the number of channels
+    required_input: usize,
     /// The size of the FFT
     fft_size: usize,
     /// The number of audio channels. Ex: 2 for stereo audio.
@@ -343,40 +354,48 @@ impl AudioFft {
             input_cursor: 0,
             fft_size: fft_size,
             channel_count: channel_count,
+            required_input: channel_count * fft_size,
             hanning: HanningWindowCalculator::new(fft_size),
             output: out_vec,
         }
     }
 
+
+    /// Exeuce the FFT
     pub fn execute(&mut self) {
         self.multichan_fft.execute();
         self.input_cursor = 0;
     }
 
-
     /// Allows a client to feed data into the FFT in chunks. This is useful for
     /// ineracting with PulseAudio because its asynchronous API gives audio data
-    /// in seemingly arbitrary chunks.
-    /// Returns the number of bytes it read. If the number of bytes returned is
-    /// less than the input size, the FFT is ready to execute.
+    /// in arbitrary chunk sizes depending on how much data is available.
+    ///
+    /// Arguments:
+    ///     input: A slice pointing at S16LE audio data for the number of
+    ///            channels in self.channel_count
+    /// Returns:
+    ///     The number of bytes it read. If the number of bytes returned is
+    ///     less than the input size, the FFT is ready to execute.
     pub fn feed_data(&mut self, input: &[i16]) -> usize {
         let mut bytes_read: usize = 0;
-        let total_input = self.channel_count * self.fft_size;
 
-        let mut inputs: Vec<&mut [f64]> = Vec::with_capacity(self.channel_count);
-        for channel in self.multichan_fft.channel_plans.iter_mut() {
-            inputs.push(channel.get_input_slice());
-        }
+        let mut inputs = self.multichan_fft.get_inputs();
 
         for value in input.iter() {
-            if self.input_cursor == total_input {
+            // If there is enough data to run the FFT, return the number of
+            // bytes that were read out of this input slice
+            if self.input_cursor == self.required_input {
                 return bytes_read;
             }
-            // The channel number the current value is for
+
+            // The channel number and index the current value is for
             let channel_num = self.input_cursor % self.channel_count;
-            // The index of the value in its channel
             let channel_index = self.input_cursor / self.channel_count;
+
+            // Compute the hanning window value for the element set the input
             inputs[channel_num][channel_index] = self.hanning.get_value(channel_index, *value as f64);
+
             bytes_read += 1;
             self.input_cursor += 1;
         }
@@ -384,13 +403,17 @@ impl AudioFft {
         bytes_read
     }
 
+    /// Wrapper for feed_data which takes an &[u8] slice instead of an &[i16]
+    /// slice. Simply casts the slice to an i16 slice then calls feed_data on
+    /// it.
     pub fn feed_u8_data(&mut self, input: &[u8]) -> usize {
         let i16_ptr: *const i16 = input.as_ptr() as *const i16;
         self.feed_data(unsafe{ slice::from_raw_buf(&i16_ptr, input.len()/2) }) * 2
     }
 
-
-    /// Computes the combined output of all channels
+    /// Computes the combined output of all channels into the output field of
+    /// this struct. Every time compute_output is called, it reuses the same
+    /// output vector to avoid allocations.
     pub fn compute_output(&mut self) {
         let mut first = true;
         for channel in self.multichan_fft.channel_plans.iter() {
@@ -408,8 +431,8 @@ impl AudioFft {
     }
 
     /// Borrow the combined output vector
-    pub fn get_output(&self) -> &Vec<f64> {
-        &self.output
+    pub fn get_output(&self) -> &[f64] {
+        self.output.as_slice()
     }
 }
 
