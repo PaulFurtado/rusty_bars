@@ -6,6 +6,13 @@ use self::libc::{c_int, c_char};
 use ncurses_wrapper::{Window,endwin};
 use analyze_spectrum::scale_fft_output;
 
+/// The character to use for a bar
+const BAR_CHAR: c_char = '|' as c_char;
+/// The character to use where there is no bar
+const EMPTY_CHAR: c_char = ' ' as c_char;
+/// The character to use where there is a lack of data due to scaling issues.
+const BORDER_CHAR: c_char = 'X' as c_char;
+
 
 /// Loops through an iterator of f64 and gets the min and max values.
 /// The min/max functions in the standard library don't work on floats.
@@ -23,8 +30,6 @@ fn get_min_max<'a, I: Iterator<Item=&'a f64>>(iter: &'a mut I) -> (f64, f64) {
     (min, max)
 }
 
-
-
 /// Resize the row buffer to width
 fn resize_rowbuf(row: &mut Vec<c_char>, width: usize) {
     while row.len() < width {
@@ -35,7 +40,6 @@ fn resize_rowbuf(row: &mut Vec<c_char>, width: usize) {
     }
     row.shrink_to_fit();
 }
-
 
 pub struct Visualizer{
    // The ncurses Window object
@@ -131,15 +135,15 @@ impl Visualizer {
         for (y, row) in self.rows.iter_mut().enumerate().rev() {
             for (x, val) in row.iter_mut().enumerate() {
                 *val = (if x >= scaled.len() {
-                    'X'
+                    BORDER_CHAR
                 } else {
                     let val = scaled[x];
                     if val >= y {
-                        '|'
+                        BAR_CHAR
                     } else {
-                        ' '
+                        EMPTY_CHAR
                     }
-                }) as c_char;
+                });
             }
 
             match self.win.addbytes((self.height - y -1) as c_int, 0, row) {
