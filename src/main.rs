@@ -121,15 +121,36 @@ impl<'a> VizRunnerInternal<'a> {
         let mut external = self.external.clone().unwrap();
 
         stream.set_read_callback(move |mut stream, nbytes| {
-            let internal = external.internal.borrow_mut();
+            let mut internal = external.internal.borrow_mut();
             internal.stream_read_callback(stream, nbytes);
         });
 
+        stream.connect_record(Some(monitor_name), None, None);
     }
 
-    pub fn stream_read_callback(&mut self, stream: PulseAudioStream, nbytes: size_t) {
-        println!("got data");
+    pub fn stream_read_callback(&mut self, mut stream: PulseAudioStream, nbytes: size_t) {
+        println_stderr!("got data");
+        match stream.peek() {
+            Ok(data) => {
+                let mut fed_count: usize = 0;
+                let mut iterations: usize = 0;
+                while fed_count < data.len() {
+                    fed_count += self.fft.feed_u8_data(data);
+                    println_stderr!("iteration: {}, bytes: {}", iterations, data.len());
+                    if fed_count < data.len() {
+                        println_stderr!("executing!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                        self.fft.execute();
+                        self.fft.compute_output();
+                        self.viz.render_frame(self.fft.get_output()).unwrap();
 
+                    } else {
+                        println_stderr!("not executing.");
+                    }
+                }
+            },
+            Err(_) => return
+        }
+        stream.drop_fragment().unwrap();
     }
 }
 
