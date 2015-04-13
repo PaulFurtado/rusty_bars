@@ -127,7 +127,7 @@ pub mod stream {
             cb: pa_stream_request_cb_t,
             userdata: *mut c_void);
 
-        pub fn pa_stream_disconnect(s: *mut pa_stream);
+        pub fn pa_stream_disconnect(s: *mut pa_stream) -> c_int;
 
         /// Sets data to a pointer to readable data, and nbytes to the
         /// amount of data available. If data is null and nbytes is 0,

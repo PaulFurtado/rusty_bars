@@ -209,7 +209,7 @@ impl<'a> Context<'a> {
     ///    name: a name for this stream
     ///    ss: the sample format of the stream
     ///    map: the desired channel
-    pub fn create_stream(&self, name: &str, ss: &pa_sample_spec, map: Option<&pa_channel_map>) -> PulseAudioStream {
+    pub fn create_stream(&mut self, name: &str, ss: &pa_sample_spec, map: Option<&pa_channel_map>) -> PulseAudioStream<'a> {
         //let internal_guard = self.internal.lock();
         let mut internal = self.internal.borrow_mut();
 

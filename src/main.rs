@@ -59,6 +59,7 @@ struct VizRunnerInternal<'a> {
     fft: fftw_wrapper::AudioFft,
     viz: visualizer::Visualizer,
     external: Option<VizRunner<'a>>,
+    stream: Option<PulseAudioStream<'a>>,
 }
 
 
@@ -69,8 +70,32 @@ impl<'a> VizRunnerInternal<'a> {
             context: context,
             fft: fftw_wrapper::AudioFft::new(1024, 2),
             viz: visualizer::Visualizer::new(),
-            external: None
+            external: None,
+            stream: None
         }
+    }
+
+
+    pub fn subscribe_to_sink_changes(&mut self) {
+        let mut external = self.external.clone().unwrap();
+        self.context.set_event_callback(move |context, event, index| {
+            let facility = event & (pa_subscription_event_type::FACILITY_MASK as c_int);
+            let ev_type = event & (pa_subscription_event_type::TYPE_MASK as c_int);
+
+            if facility == pa_subscription_event_type::SERVER as c_int {
+                if ev_type == pa_subscription_event_type::CHANGE as c_int {
+                    let mut internal = external.internal.borrow_mut();
+                    internal.update_sink();
+                }
+            }
+        });
+
+        self.context.add_subscription(pa_subscription_mask::SERVER, move |context, success| {
+            if !success {
+                println_stderr!("failed to subscribe to server changes!");
+            }
+        });
+
     }
 
     pub fn connect(&mut self) {
@@ -89,6 +114,7 @@ impl<'a> VizRunnerInternal<'a> {
 
     pub fn on_ready(&mut self) {
         self.update_sink();
+        self.subscribe_to_sink_changes();
     }
 
     pub fn update_sink(&mut self) {
@@ -108,8 +134,15 @@ impl<'a> VizRunnerInternal<'a> {
         });
     }
 
+    /// Called whenever we change the sink
     pub fn on_new_sink(&mut self, monitor_name: &str) {
-        println_stderr!("new sink: {}", monitor_name);
+        match self.stream {
+            Some(ref mut stream) => { stream.disconnect(); },
+            None => {}
+        }
+        self.stream = None;
+
+        // TODO: sample spec should be constant
         let sample_spec = pa_sample_spec {
             format:pa_sample_format::PA_SAMPLE_S16LE,
             rate: 44100,
@@ -117,15 +150,14 @@ impl<'a> VizRunnerInternal<'a> {
         };
 
         let mut stream = self.context.create_stream("rs_client", &sample_spec, None);
-
         let mut external = self.external.clone().unwrap();
-
+        println_stderr!("new stream addr: {:x}", stream.get_raw_ptr() as usize);
         stream.set_read_callback(move |mut stream, nbytes| {
             let mut internal = external.internal.borrow_mut();
             internal.stream_read_callback(stream, nbytes);
         });
-
         stream.connect_record(Some(monitor_name), None, None);
+        self.stream = Some(stream);
     }
 
     /// Called whenever the FFT has enough data to run a frame of the visualizer
@@ -137,6 +169,21 @@ impl<'a> VizRunnerInternal<'a> {
 
     /// Called whenever the stream is ready to be read.
     pub fn stream_read_callback(&mut self, mut stream: PulseAudioStream, nbytes: size_t) {
+        // Ignore the callback if the stream just changed.
+        match self.stream {
+            Some(ref s) => {
+                if s.get_raw_ptr() != stream.get_raw_ptr() {
+                    // disconnect frequently fails if the stream is in the wrong state,
+                    // so if we got data for a stale stream, try disconnecting it again
+                    stream.disconnect();
+                    return;
+                }
+            },
+            None => {
+                return;
+            }
+        }
+
         match stream.peek() {
             Ok(data) => {
                 let mut fed_count: usize = 0;
@@ -156,93 +203,11 @@ impl<'a> VizRunnerInternal<'a> {
 
 
 
-fn main_new() {
+fn main() {
     let mainloop = PulseAudioMainloop::new();
     let mut viz = VizRunner::new(&mainloop);
-    println_stderr!("connect");
+    println_stderr!("connecting");
     viz.connect();
     println_stderr!("starting the loop");
-    mainloop.run();
-}
-
-
-fn main() {
-    main_new();
-    return;
-    let mainloop = PulseAudioMainloop::new();
-    let mut context = mainloop.create_context("rs_client");
-    /*
-    context.set_state_callback(move |context, state| {
-        match state {
-            pa_context_state::READY => {
-                context.get_server_info(move |context, info| {
-                    context.get_sink_info_by_name(info.get_default_sink_name(), move |context, info| {
-                        match info {
-                            Some(info) => {
-                                let sample_spec = pa_sample_spec {
-                                    format:pa_sample_format::PA_SAMPLE_S16LE,
-                                    rate: 44100,
-                                    channels: 2
-                                };
-
-                                let mut vis = visualizer::Visualizer::new();
-                                let mut fft = fftw_wrapper::AudioFft::new(1024, 2);
-                                let mut stream = context.create_stream("rs_client", &sample_spec, None);
-                                stream.set_read_callback(move |mut stream, nbytes| {
-                                    match stream.peek() {
-                                        Ok(data) => {
-                                            let mut fed_count: usize = 0;
-                                            let mut iterations: usize = 0;
-                                            while fed_count < data.len() {
-                                                fed_count += fft.feed_u8_data(data);
-                                                println_stderr!("iteration: {}, bytes: {}", iterations, data.len());
-                                                if fed_count < data.len() {
-                                                    println_stderr!("executing!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                                                    fft.execute();
-                                                    fft.compute_output();
-                                                    vis.render_frame(fft.get_output()).unwrap();
-
-                                                } else {
-                                                    println_stderr!("not executing.");
-                                                }
-                                            }
-                                        },
-                                        Err(_) => return
-                                    }
-                                    stream.drop_fragment().unwrap();
-                                });
-
-                                stream.connect_record(Some(info.get_monitor_source_name()), None, None);
-                                return;
-
-                                context.set_event_callback(move |context, event, index| {
-                                    let facility = (event & (pa_subscription_event_type::FACILITY_MASK as c_int));
-                                    let ev_type = (event & (pa_subscription_event_type::TYPE_MASK as c_int));
-
-                                    if facility == pa_subscription_event_type::SERVER as c_int {
-                                        if ev_type == pa_subscription_event_type::CHANGE as c_int {
-                                            context.get_server_info(move |context, info| {
-                                                println!("new output: {}", info.get_default_sink_name());
-                                            });
-                                        }
-                                    }
-                                });
-
-                                context.add_subscription(pa_subscription_mask::SERVER, move |context, success| {
-                                    if !success {
-                                        println!("failed to subscribe to event!");
-                                    }
-                                });
-                            },
-                            None => {}
-                        }
-                    });
-                });
-            },
-            _ => {}
-        }
-    });
-    */
-    context.connect(None, pa_context_flags::NOAUTOSPAWN);
     mainloop.run();
 }

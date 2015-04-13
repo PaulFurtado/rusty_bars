@@ -122,7 +122,7 @@ mod safe {
 
 
     /// Disconnects the stream from its source.
-    pub fn pa_stream_disconnect(stream: *mut pa_stream) {
+    pub fn pa_stream_disconnect(stream: *mut pa_stream) -> c_int {
         assert!(!stream.is_null());
         unsafe { ext::stream::pa_stream_disconnect(stream) }
     }
@@ -234,6 +234,11 @@ impl<'a> PulseAudioStream<'a> {
         stream
     }
 
+    pub fn get_raw_ptr(&self) -> *const opaque::pa_stream {
+        let mut internal = self.internal.borrow();
+        internal.pa_stream as *const opaque::pa_stream
+    }
+
     /// Return the current fragment from Pulse's record stream.
     /// To return the next fragment, drop_fragment must be called after peeking.
     pub fn peek(&mut self) -> Result<&[u8], PeekError> {
@@ -285,7 +290,7 @@ impl<'a> PulseAudioStream<'a> {
     }
 
     /// Disconnect the stream from its source/sink.
-    pub fn disconnect(&mut self) {
+    pub fn disconnect(&mut self) -> c_int {
         let mut internal = self.internal.borrow_mut();
         safe::pa_stream_disconnect(internal.pa_stream)
     }
