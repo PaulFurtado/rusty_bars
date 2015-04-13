@@ -4,7 +4,6 @@ extern crate libc;
 
 use self::libc::{c_int, c_char};
 use ncurses_wrapper::{Window,endwin};
-use analyze_spectrum::scale_fft_output;
 
 /// The character to use for a bar
 const BAR_CHAR: c_char = '|' as c_char;
@@ -21,6 +20,41 @@ const BORDER_CHAR: c_char = 'X' as c_char;
 /// (This is not the same as EMPTY_CHAR so that it is easy to detect that we
 /// didn't draw some part of the screen. Users should never see this.)
 const INIT_CHAR: c_char = '#' as c_char;
+
+
+
+/// Scales down a vector by averaging the elements between the resulting points
+pub fn scale_fft_output(input: &Vec<f64>, new_len: usize) -> Vec<f64> {
+    if new_len >= input.len() {
+        return input.clone();
+    }
+
+    let band_size: usize = input.len() / new_len;
+    assert!(band_size > 0);
+    let mut output: Vec<f64> = Vec::with_capacity(new_len);
+
+    let mut temp_count: usize = 0;
+    let mut sum: f64 = 0.0;
+
+    for &x in input.iter() {
+        if temp_count >= band_size {
+            let avg: f64 = sum/temp_count as f64;
+            output.push(avg);
+            temp_count = 0;
+            sum = 0.0;
+        } else {
+            sum += x;
+            temp_count+=1;
+        }
+    }
+
+    if temp_count >= band_size {
+        output.push(sum/temp_count as f64);
+    }
+
+    output
+}
+
 
 
 /// Loops through an iterator of f64 and gets the min and max values.
