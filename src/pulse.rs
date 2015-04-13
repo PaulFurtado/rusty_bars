@@ -11,7 +11,6 @@ use ext;
 use std::ffi::CString;
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::sync::{Arc, Mutex};
 use std::ptr;
 
 use pulse_types::*;
@@ -108,9 +107,6 @@ impl<'a> PulseAudioMainloop<'a> {
 }
 
 
-//unsafe impl Send for ContextInternal {}
-
-
 
 #[derive(Clone)]
 pub struct Context<'a> {
@@ -122,11 +118,10 @@ impl<'a> Context<'a> {
     /// Get a new PulseAudio context. It's probably easier to get this via the
     /// mainloop.
     pub fn new(mainloop: &PulseAudioMainloop, client_name: &str) -> Context<'a> {
-        let mut context = Context {
+        let context = Context {
             internal: Rc::new(RefCell::new(ContextInternal::new(mainloop, client_name))),
         };
         {
-            //let internal_guard = context.internal.lock();
             let mut internal = context.internal.borrow_mut();
             internal.external = Some(context.clone());
         }
@@ -136,7 +131,6 @@ impl<'a> Context<'a> {
     /// Set the callback for server state. This callback gets called many times.
     /// Do not start sending commands until this returns pa_context_state::READY
     pub fn set_state_callback<C>(&self, cb: C) where C: FnMut(Context, pa_context_state) + 'a {
-        //let internal_guard = self.internal.lock();
         let mut internal = self.internal.borrow_mut();
         internal.state_cb = Some(Box::new(cb) as BoxedStateCallback);
         pa_context_set_state_callback(internal.ptr, _state_callback, internal.as_void_ptr());
@@ -148,15 +142,13 @@ impl<'a> Context<'a> {
     /// 3. Directly after running this method, start the mainloop to start
     ///    getting callbacks.
     pub fn connect(&self, server: Option<&str>, flags: pa_context_flags) {
-        //let internal_guard = self.internal.lock();
-        let mut internal = self.internal.borrow_mut();
+        let internal = self.internal.borrow_mut();
         pa_context_connect(internal.ptr, server, flags, None);
     }
 
     /// Gets basic information about the server. See the pa_server_info struct
     /// for more details.
     pub fn get_server_info<C>(&self, cb: C) where C: FnMut(Context, &pa_server_info) + 'a {
-        //let internal_guard = self.internal.lock();
         let mut internal = self.internal.borrow_mut();
         internal.server_info_cb = Some(Box::new(cb) as BoxedServerInfoCallback);
         pa_context_get_server_info(internal.ptr, _server_info_callback, internal.as_void_ptr());
@@ -169,7 +161,6 @@ impl<'a> Context<'a> {
     /// the information about the sink, and one with None indicating the end of
     /// the list.
     pub fn get_sink_info_by_name<C>(&self, name: &str, cb: C) where C: FnMut(Context, Option<&pa_sink_info>) + 'a {
-        //let internal_guard = self.internal.lock();
         let mut internal = self.internal.borrow_mut();
         internal.sink_info_cb = Some(Box::new(cb) as BoxedSinkInfoCallback);
         pa_context_get_sink_info_by_name(internal.ptr, name, _sink_info_callback, internal.as_void_ptr());
@@ -177,7 +168,6 @@ impl<'a> Context<'a> {
 
     /// Adds an event subscription
     pub fn add_subscription<C>(&self, mask: pa_subscription_mask, cb: C) where C: FnMut(Context, bool) + 'a {
-        //let internal_guard = self.internal.lock();
         let mut internal = self.internal.borrow_mut();
         internal.context_success_cb = Some(Box::new(cb) as BoxedPaContextSuccessCallback);
         internal.subscriptions.add(mask);
@@ -187,7 +177,6 @@ impl<'a> Context<'a> {
 
     /// Removes an event subscription
     pub fn remove_subscription<C>(&self, mask: pa_subscription_mask, cb: C) where C: FnMut(Context, bool) + 'a {
-        //let internal_guard = self.internal.lock();
         let mut internal = self.internal.borrow_mut();
         internal.context_success_cb = Some(Box::new(cb) as BoxedPaContextSuccessCallback);
         internal.subscriptions.remove(mask);
@@ -197,7 +186,6 @@ impl<'a> Context<'a> {
 
     /// Sets the callback for subscriptions
     pub fn set_event_callback<C>(&self, cb: C) where C: FnMut(Context, c_int, u32) + 'a {
-        //let internal_guard = self.internal.lock();
         let mut internal = self.internal.borrow_mut();
         internal.event_cb = Some(Box::new(cb) as BoxedSubscriptionCallback);
         pa_context_set_subscribe_callback(internal.ptr, _subscription_event_callback, internal.as_void_ptr());
@@ -210,8 +198,7 @@ impl<'a> Context<'a> {
     ///    ss: the sample format of the stream
     ///    map: the desired channel
     pub fn create_stream(&mut self, name: &str, ss: &pa_sample_spec, map: Option<&pa_channel_map>) -> PulseAudioStream<'a> {
-        //let internal_guard = self.internal.lock();
-        let mut internal = self.internal.borrow_mut();
+        let internal = self.internal.borrow_mut();
 
         let channel_map_ptr: *const pa_channel_map = match map {
             Some(map) => map,

@@ -1,7 +1,7 @@
 #![allow(unstable)]
 #![allow(non_camel_case_types)]
 #![allow(raw_pointer_derive)]
-
+#![allow(missing_copy_implementations)]
 
 pub use self::cb::*;
 pub use self::opaque::*;

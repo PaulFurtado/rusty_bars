@@ -1,4 +1,5 @@
 #![allow(unstable)]
+#![allow(missing_copy_implementations)]
 
 extern crate libc;
 

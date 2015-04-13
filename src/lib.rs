@@ -1,6 +1,5 @@
 #![allow(unstable)]
 #![feature(unsafe_destructor)]
-#![feature(unboxed_closures)]
 
 pub mod ncurses_wrapper;
 pub mod stream;

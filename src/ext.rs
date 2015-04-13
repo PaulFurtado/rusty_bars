@@ -1,20 +1,10 @@
 #![allow(unstable)]
 #![allow(dead_code)]
 
-
 extern crate libc;
-use self::libc::funcs::c95::string::strlen;
-use self::libc::{c_int, c_char, c_void, size_t};
-use std::ffi::CString;
-use std::ptr;
-use std::mem;
-use std::fmt;
-use std::slice;
-use std::sync::{Arc, Mutex};
-use std::io::{Reader, Writer, IoResult, IoError, IoErrorKind};
+use self::libc::{c_int, c_char, c_void};
 
-pub use pulse_types::*;
-pub use self::stream::*;
+use pulse_types::*;
 
 #[link(name="pulse")]
 extern {
