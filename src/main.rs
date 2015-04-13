@@ -128,23 +128,23 @@ impl<'a> VizRunnerInternal<'a> {
         stream.connect_record(Some(monitor_name), None, None);
     }
 
+    /// Called whenever the FFT has enough data to run a frame of the visualizer
+    pub fn on_fft_frame_ready(&mut self) {
+        self.fft.execute();
+        self.fft.compute_output();
+        self.viz.render_frame(self.fft.get_output()).unwrap();
+    }
+
+    /// Called whenever the stream is ready to be read.
     pub fn stream_read_callback(&mut self, mut stream: PulseAudioStream, nbytes: size_t) {
-        println_stderr!("got data");
         match stream.peek() {
             Ok(data) => {
                 let mut fed_count: usize = 0;
                 let mut iterations: usize = 0;
                 while fed_count < data.len() {
                     fed_count += self.fft.feed_u8_data(data);
-                    println_stderr!("iteration: {}, bytes: {}", iterations, data.len());
                     if fed_count < data.len() {
-                        println_stderr!("executing!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                        self.fft.execute();
-                        self.fft.compute_output();
-                        self.viz.render_frame(self.fft.get_output()).unwrap();
-
-                    } else {
-                        println_stderr!("not executing.");
+                        self.on_fft_frame_ready();
                     }
                 }
             },
