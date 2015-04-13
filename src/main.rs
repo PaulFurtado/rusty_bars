@@ -4,24 +4,22 @@
 // TODO: Automatically get default sink
 
 extern crate libc;
+extern crate rust_pulse;
 
 use self::libc::{c_int, c_char, size_t};
-use std::ptr;
-use std::os;
-use std::mem;
+
+use std::{mem, os, ptr};
 use std::mem::transmute;
 use std::ffi::CString;
 use std::str::from_utf8;
 use libc::funcs::c95::string::strlen;
 use std::cmp::max;
-pub mod analyze_spectrum;
-pub mod visualizer;
-mod fftw_wrapper;
-mod ncurses_wrapper;
-mod pulse_types;
-mod pulse;
-mod util;
 
+use rust_pulse::pulse::*;
+use rust_pulse::stream::*;
+use rust_pulse::pulse_types::*;
+use rust_pulse::visualizer;
+use rust_pulse::fftw_wrapper;
 
 macro_rules! println_stderr(
     ($($arg:tt)*) => (
@@ -36,8 +34,6 @@ macro_rules! println_stderr(
 
 
 fn main() {
-    use pulse::*;
-
     let mainloop = PulseAudioMainloop::new();
     let mut context = mainloop.create_context("rs_client");
     context.set_state_callback(move |mut context, state| {
@@ -69,8 +65,8 @@ fn main() {
                                 //simple_run_analyzer(info.get_monitor_source_name());
                                 //return;
 
-                                let sample_spec = pulse_types::structs::pa_sample_spec {
-                                    format: pulse_types::pa_sample_format::PA_SAMPLE_S16LE,
+                                let sample_spec = pa_sample_spec {
+                                    format:pa_sample_format::PA_SAMPLE_S16LE,
                                     rate: 44100,
                                     channels: 2
                                 };
