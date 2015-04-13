@@ -8,10 +8,19 @@ use analyze_spectrum::scale_fft_output;
 
 /// The character to use for a bar
 const BAR_CHAR: c_char = '|' as c_char;
-/// The character to use where there is no bar
+
+/// The character to use for rows above the bar
 const EMPTY_CHAR: c_char = ' ' as c_char;
+
 /// The character to use where there is a lack of data due to scaling issues.
+/// (If the user sees this character, it is because the visualizer wasn't
+/// properly scaled to the window width)
 const BORDER_CHAR: c_char = 'X' as c_char;
+
+/// The character to initialize the row arrays with.
+/// (This is not the same as EMPTY_CHAR so that it is easy to detect that we
+/// didn't draw some part of the screen. Users should never see this.)
+const INIT_CHAR: c_char = '#' as c_char;
 
 
 /// Loops through an iterator of f64 and gets the min and max values.
@@ -33,7 +42,7 @@ fn get_min_max<'a, I: Iterator<Item=&'a f64>>(iter: &'a mut I) -> (f64, f64) {
 /// Resize the row buffer to width
 fn resize_rowbuf(row: &mut Vec<c_char>, width: usize) {
     while row.len() < width {
-        row.push('#' as c_char);
+        row.push(INIT_CHAR);
     }
     while row.len() > width {
         row.pop().unwrap();
