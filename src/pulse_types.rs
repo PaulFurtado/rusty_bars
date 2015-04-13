@@ -111,6 +111,26 @@ pub mod enums {
     }
 
     #[repr(C)]
+    #[derive(Copy,Clone)]
+    pub enum pa_sample_format {
+        PA_SAMPLE_U8,
+        PA_SAMPLE_ALAW,
+        PA_SAMPLE_ULAW,
+        PA_SAMPLE_S16LE,
+        PA_SAMPLE_S16BE,
+        PA_SAMPLE_FLOAT32LE,
+        PA_SAMPLE_FLOAT32BE,
+        PA_SAMPLE_S32LE,
+        PA_SAMPLE_S32BE,
+        PA_SAMPLE_S24LE,
+        PA_SAMPLE_S24BE,
+        PA_SAMPLE_S24_32LE,
+        PA_SAMPLE_S24_32BE,
+        PA_SAMPLE_MAX,
+        PA_SAMPLE_INVALID = -1
+    }
+
+    #[repr(C)]
     #[derive(Copy)]
     pub enum pa_channel_position_t {
         INVALID,
@@ -324,7 +344,7 @@ pub mod structs {
     #[derive(Copy)]
     #[repr(C)]
     pub struct pa_sample_spec {
-      pub format: c_int,
+      pub format: pa_sample_format,
       pub rate: u32,
       pub channels: u8
     }
