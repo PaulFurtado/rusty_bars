@@ -5,17 +5,10 @@
 extern crate libc;
 extern crate rust_pulse;
 
-use self::libc::{c_int, c_char, size_t};
+use self::libc::{c_int};
 
-use std::{mem, os, ptr};
-use std::mem::transmute;
-use std::ffi::CString;
-use std::str::from_utf8;
-use libc::funcs::c95::string::strlen;
-use std::cmp::max;
 
 use rust_pulse::pulse::*;
-use rust_pulse::stream::*;
 use rust_pulse::pulse_types::*;
 use rust_pulse::visualizer;
 use rust_pulse::fftw_wrapper;
