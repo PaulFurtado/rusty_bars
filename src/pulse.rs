@@ -1,24 +1,23 @@
 #![allow(unstable)]
 
+/// This module contains a Rust interface to PulseAudio's C API.
 
 extern crate libc;
+
 use self::libc::funcs::c95::string::strlen;
 use self::libc::{c_int, c_char, c_void};
 
-use ext;
-
-
-use std::ffi::CString;
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::ffi::CString;
 use std::ptr;
+use std::rc::Rc;
 
+use ext;
 use pulse_types::*;
-pub use stream;
+use stream::{PulseAudioStream};
 
-use stream::*;
 
-// Types for callback closures
+/// Types for callback closures
 type StateCallback<'a> = FnMut(Context, pa_context_state) + 'a;
 type ServerInfoCallback<'a> = FnMut(Context, &pa_server_info) + 'a;
 type SinkInfoCallback<'a> = FnMut(Context, Option<&pa_sink_info>) + 'a;
@@ -26,7 +25,7 @@ type SubscriptionCallback<'a> = FnMut(Context, c_int, u32) + 'a;
 type PaContextSuccessCallback<'a> = FnMut(Context, bool) + 'a;
 
 
-// Boxed types for callback closures
+/// Boxed types for callback closures.
 type BoxedStateCallback<'a> = Box<StateCallback<'a>>;
 type BoxedServerInfoCallback<'a> = Box<ServerInfoCallback<'a>>;
 type BoxedSinkInfoCallback<'a> = Box<SinkInfoCallback<'a>>;
@@ -34,7 +33,7 @@ type BoxedSubscriptionCallback<'a> = Box<SubscriptionCallback<'a>>;
 type BoxedPaContextSuccessCallback<'a> = Box<PaContextSuccessCallback<'a>>;
 
 
-/// Coverts a pulse error code to a String
+/// Convert a pulse error code to a String
 fn pa_err_to_string(err: c_int) -> Result<(), String> {
     if err == 0 {
         Ok(())
@@ -50,7 +49,7 @@ fn pa_err_to_string(err: c_int) -> Result<(), String> {
 
 
 /// A safe wrapper for pa_context_connect
-pub fn pa_context_connect(context: *mut opaque::pa_context, server_name: Option<&str>,
+fn pa_context_connect(context: *mut opaque::pa_context, server_name: Option<&str>,
     flags: enums::pa_context_flags, spawn_api: Option<*const opaque::pa_spawn_api>) {
 
     assert!(!context.is_null());
@@ -71,7 +70,6 @@ pub fn pa_context_connect(context: *mut opaque::pa_context, server_name: Option<
     let res = unsafe { ext::pa_context_connect(context, server, flags, spawn_api_ptr) };
     assert!(res == 0);
 }
-
 
 
 /// A struct which wraps the PulseAudio async main loop.
@@ -105,7 +103,6 @@ impl<'a> PulseAudioMainloop<'a> {
         // TODO: error handling
     }
 }
-
 
 
 #[derive(Clone)]
@@ -184,19 +181,19 @@ impl<'a> Context<'a> {
         pa_context_subscribe(internal.ptr, new_mask, _subscription_success_callback, internal.as_void_ptr());
     }
 
-    /// Sets the callback for subscriptions
+    /// Set the callback for subscriptions
     pub fn set_event_callback<C>(&self, cb: C) where C: FnMut(Context, c_int, u32) + 'a {
         let mut internal = self.internal.borrow_mut();
         internal.event_cb = Some(Box::new(cb) as BoxedSubscriptionCallback);
         pa_context_set_subscribe_callback(internal.ptr, _subscription_event_callback, internal.as_void_ptr());
     }
 
-
     /// Create an unconnected PulseAudioStream from this server.
+    ///
     /// Args:
-    ///    name: a name for this stream
-    ///    ss: the sample format of the stream
-    ///    map: the desired channel
+    ///    name: A name for this stream.
+    ///    ss: The sample format of the stream.
+    ///    map: The desired channel. If None, PulseAudio uses its default.
     pub fn create_stream(&mut self, name: &str, ss: &pa_sample_spec, map: Option<&pa_channel_map>) -> PulseAudioStream<'a> {
         let internal = self.internal.borrow_mut();
 
@@ -210,6 +207,8 @@ impl<'a> Context<'a> {
 }
 
 
+/// Inner representation of a Context.
+/// Used to call back to Rust from C.
 struct ContextInternal<'a> {
     /// A pointer to the pa_context object
     ptr: *mut pa_context,
@@ -229,16 +228,6 @@ struct ContextInternal<'a> {
     context_success_cb: Option<BoxedPaContextSuccessCallback<'a>>,
     /// Manages subscriptions to events
     subscriptions: SubscriptionManager,
-}
-
-
-/// Currently the drop method has nothing to trigger it. Need to figure out a
-/// game plan here.
-#[unsafe_destructor]
-impl<'a> Drop for ContextInternal<'a> {
-    fn drop(&mut self) {
-        println!("drop ContextInternal");
-    }
 }
 
 
@@ -316,14 +305,25 @@ impl<'a> ContextInternal<'a> {
             None => println!("warning: no success callback is set"),
         }
     }
-
 }
 
 
+/// Currently the drop method has nothing to trigger it. Need to figure out a
+/// game plan here.
+#[unsafe_destructor]
+impl<'a> Drop for ContextInternal<'a> {
+    fn drop(&mut self) {
+        println!("drop ContextInternal");
+    }
+}
+
+
+/// Represents subscribed events on a Context.
+/// An event type needs a subscription before its callback is triggered.
 struct SubscriptionManager {
     mask: c_int,
-
 }
+
 
 impl SubscriptionManager {
     /// Create a new SubscriptionManager

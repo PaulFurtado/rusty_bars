@@ -1,7 +1,7 @@
 #![allow(unstable)]
 
 extern crate libc;
-use self::libc::{c_int, size_t, c_void};
+use self::libc::{size_t, c_void};
 use std::num::Float;
 use std::f64::consts::PI;
 use std::{mem, slice};
@@ -11,7 +11,7 @@ use std::{mem, slice};
 mod ext {
     extern crate libc;
     use self::libc::{c_int, size_t, c_void};
-    use super::{FftwPlan, FftwComplex, PlannerFlags};
+    use super::{FftwComplex, PlannerFlags};
 
     #[repr(C)]
     #[derive(Copy)]
