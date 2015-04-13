@@ -80,6 +80,7 @@ pub fn pa_context_connect(context: *mut opaque::pa_context, server_name: Option<
 
 
 /// A struct which wraps the PulseAudio async main loop.
+#[derive(Copy)]
 pub struct PulseAudioMainloop {
     internal: *mut pa_mainloop
 }

@@ -1,16 +1,12 @@
-#![feature(unsafe_destructor)]
 #![allow(unstable)]
-#![allow(dead_code)]
-
 
 extern crate libc;
 
-use self::libc::funcs::c95::string::strlen;
 use self::libc::{c_int, c_char, c_void, size_t};
 
 use std::{ptr, mem, fmt, slice};
 use std::ffi::CString;
-use std::io::{Reader, Writer, IoResult, IoError, IoErrorKind};
+use std::io::{IoResult, IoError, IoErrorKind};
 use std::sync::{Arc, Mutex};
 
 use pulse_types::*;
@@ -205,21 +201,17 @@ impl PulseAudioStream {
     /// To return the next fragment, drop_fragment must be called after peeking.
     pub fn peek(&mut self) -> IoResult<&[u8]> {
         let internal_guard = self.internal.lock();
-        let mut internal = internal_guard.unwrap();
+        let internal = internal_guard.unwrap();
 
         let mut buf: *mut u8 = ptr::null_mut();
         let mut bufptr: *mut *mut u8 = &mut buf;
 
-
         let mut nbytes: size_t = 0;
 
-        let mut ret: c_int = 0;
-        unsafe {
-            ret = pa_stream_peek(internal.pa_stream, bufptr, &mut nbytes);
-        };
+        let mut ret: c_int = pa_stream_peek(internal.pa_stream, bufptr, &mut nbytes);
 
-        if (buf.is_null()) {
-            if (nbytes == 0) {
+        if buf.is_null() {
+            if nbytes == 0 {
                 return Err(IoError {
                     kind: IoErrorKind::NoProgress,
                     desc: "Buffer is empty",
@@ -262,7 +254,7 @@ impl PulseAudioStream {
         stream_flags: Option<pa_stream_flags_t>) -> Result<c_int, String> {
 
         let internal_guard = self.internal.lock();
-        let mut internal = internal_guard.unwrap();
+        let internal = internal_guard.unwrap();
 
         pa_stream_connect_record(
             internal.pa_stream, source_name, buffer_attributes, stream_flags)
