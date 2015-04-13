@@ -14,7 +14,7 @@ const EMPTY_CHAR: c_char = ' ' as c_char;
 /// The character to use where there is a lack of data due to scaling issues.
 /// (If the user sees this character, it is because the visualizer wasn't
 /// properly scaled to the window width)
-const BORDER_CHAR: c_char = 'X' as c_char;
+const BORDER_CHAR: c_char = ' ' as c_char;
 
 /// The character to initialize the row arrays with.
 /// (This is not the same as EMPTY_CHAR so that it is easy to detect that we

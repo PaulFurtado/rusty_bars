@@ -11,6 +11,7 @@ use pulse::types::pa_subscription_mask;
 /// Helper for managing the subscription mask for subscribed events.
 /// PulseAudio uses the pa_subscription_mask enum to store each subscription
 /// event type. This struct helps manage the combined mask of subscriptions.
+#[derive(Copy, Clone)]
 pub struct SubscriptionManager {
     mask: c_int,
 }

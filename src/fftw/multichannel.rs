@@ -6,9 +6,9 @@ use fftw::plan::*;
 /// An FFTW Plan wrapper for multiple channels of data.
 pub struct MultiChannelFft {
     /// The size of the FFTs to be run
-    size: usize,
+    pub size: usize,
     /// The number of channels
-    channel_count: usize,
+    pub channel_count: usize,
     /// The plans for each channel
     pub channel_plans: Vec<FftwPlan>
 }
