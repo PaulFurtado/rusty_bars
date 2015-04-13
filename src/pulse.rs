@@ -792,7 +792,7 @@ impl PulseAudioStream {
 impl Drop for PulseAudioStream {
     fn drop(&mut self) {
         println!("stream drop");
-        self.disconnect()
+        //self.disconnect()
     }
 }
 

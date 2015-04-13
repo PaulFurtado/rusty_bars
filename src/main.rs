@@ -289,6 +289,12 @@ fn main() {
                                 stream.set_read_callback(move |mut stream, nbytes| {
                                     //let foo: &[u8] = stream.peek().unwrap();
                                     println!("called....");
+                                    match stream.peek() {
+                                        Ok(data) => println!("Data: {:?}", data),
+                                        Err(_) => return
+                                    }
+
+
                                     //fft.feed_u8_data(stream.peek().unwrap());
                                     //fft.execute();
                                     //fft.compute_output();
