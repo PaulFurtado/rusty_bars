@@ -553,7 +553,7 @@ fn pa_stream_new(c: *mut opaque::pa_context, name: &str, ss: *const pa_sample_sp
 /// Set data to a pointer to audio data, and nbytes to point to the amount of
 /// bytes available.
 fn pa_stream_peek (
-    stream: *mut opaque::pa_stream, data: *const *mut c_void,
+    stream: *mut opaque::pa_stream, data: *mut *mut u8,
     nbytes: *mut size_t) -> c_int {
     assert!(!stream.is_null());
     assert!(!data.is_null());
@@ -707,11 +707,14 @@ impl PulseAudioStream {
         let mut internal = internal_guard.unwrap();
 
         let mut buf: *mut u8 = ptr::null_mut();
+        let mut bufptr: *mut *mut u8 = &mut buf;
+
+
         let mut nbytes: size_t = 0;
 
         let mut ret: c_int = 0;
         unsafe {
-            ret = pa_stream_peek(internal.pa_stream, &(buf as *mut c_void), &mut nbytes);
+            ret = pa_stream_peek(internal.pa_stream, bufptr, &mut nbytes);
         };
 
         if (buf.is_null()) {
@@ -930,7 +933,7 @@ mod ext {
             /// there is a hole in the stream's buffer.
             pub fn pa_stream_peek(
                 p: *mut pa_stream,
-                data: *const *mut c_void,
+                data: *mut *mut u8,
                 nbytes: *mut size_t
             ) -> c_int;
 
