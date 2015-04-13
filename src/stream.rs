@@ -4,31 +4,44 @@
 
 
 extern crate libc;
-use libc::funcs::c95::string::strlen;
-use self::libc::{c_int, c_char, c_void, size_t};
-use std::ffi::CString;
-pub use pulse_types::*;
-use std::ptr;
-use std::mem;
-use std::fmt;
-use std::slice;
-use std::sync::{Arc, Mutex};
-use std::io::{Reader, Writer, IoResult, IoError, IoErrorKind};
 
+use self::libc::funcs::c95::string::strlen;
+use self::libc::{c_int, c_char, c_void, size_t};
+
+use std::{ptr, mem, fmt, slice};
+use std::ffi::CString;
+use std::io::{Reader, Writer, IoResult, IoError, IoErrorKind};
+use std::sync::{Arc, Mutex};
+
+use pulse_types::*;
+use ext;
 
 // Types for callback closures
-type PaStreamRequestCallback = FnMut(PulseAudioStream, size_t) + Send; // XXX
-type BoxedPaStreamRequestCallback = Box<PaStreamRequestCallback>;
+pub type PaStreamRequestCallback = FnMut(PulseAudioStream, size_t) + Send; // XXX
+pub type BoxedPaStreamRequestCallback = Box<PaStreamRequestCallback>;
+
+
+// XXX
+/// Wrapper for a PulseAudio stream read callback. Called by C when there is
+/// audio data available to read.
+extern fn _pa_stream_read_callback(
+    _: *mut opaque::pa_stream, nbytes: size_t,  userdata: *mut c_void) {
+
+    let stream_internal = unsafe{ &mut * (
+        userdata as *mut PulseAudioStreamInternal) };
+    stream_internal.read_callback(nbytes);
+}
 
 
 /// Set a callback for when there's data available to be read.
-pub fn pa_stream_set_read_callback(
+fn pa_stream_set_read_callback(
     p: *mut opaque::pa_stream,
     cb: pa_stream_request_cb_t,
     userdata: *mut c_void) {
     assert!(!p.is_null());
     unsafe { ext::stream::pa_stream_set_read_callback(p, cb, userdata) }
 }
+
 
 /// Create a new pa_stream
 fn pa_stream_new(c: *mut opaque::pa_context, name: &str, ss: *const pa_sample_spec, map: *const pa_channel_map) -> *mut opaque::pa_stream {

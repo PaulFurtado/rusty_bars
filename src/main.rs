@@ -4,23 +4,20 @@
 // TODO: Automatically get default sink
 
 extern crate libc;
+extern crate rust_pulse;
 
 use self::libc::{c_int, c_char, size_t};
-use std::ptr;
-use std::os;
-use std::mem;
+
+use std::{mem, os, ptr};
 use std::mem::transmute;
 use std::ffi::CString;
 use std::str::from_utf8;
 use libc::funcs::c95::string::strlen;
 use std::cmp::max;
-pub mod analyze_spectrum;
-pub mod visualizer;
-mod fftw_wrapper;
-mod ncurses_wrapper;
-mod pulse_types;
-mod pulse;
 
+use rust_pulse::pulse::*;
+use rust_pulse::stream::*;
+use rust_pulse::pulse_types::*;
 
 
 #[link(name="pulse-simple")]
@@ -240,10 +237,6 @@ fn simple_run_analyzer(dev: &str) {
 
 
 fn main() {
-    use pulse::*;
-
-
-
     let mainloop = PulseAudioMainloop::new();
     let mut context = mainloop.create_context("rs_client");
     context.set_state_callback(move |mut context, state| {
