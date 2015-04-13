@@ -25,7 +25,8 @@ mod safe {
     use ext;
     use pulse_types::*;
     use super::PulseAudioStreamInternal;
-    // XXX
+
+
     /// Wrapper for a PulseAudio stream read callback. Called by C when there is
     /// audio data available to read.
     pub extern fn _pa_stream_read_callback(
@@ -264,8 +265,7 @@ impl PulseAudioStream {
     pub fn drop_fragment(&mut self) -> IoResult<c_int> {
         let internal_guard = self.internal.lock();
         let internal = internal_guard.unwrap();
-
-        unsafe { Ok(safe::pa_stream_drop(internal.pa_stream)) }
+        Ok(safe::pa_stream_drop(internal.pa_stream))
     }
 
     /// Record playback from a source.
@@ -288,8 +288,7 @@ impl PulseAudioStream {
     /// Disconnect the stream from its source/sink.
     pub fn disconnect(&mut self) {
         let internal_guard = self.internal.lock();
-        let mut internal = internal_guard.unwrap();
-
+        let internal = internal_guard.unwrap();
         safe::pa_stream_disconnect(internal.pa_stream)
     }
 
