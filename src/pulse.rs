@@ -223,11 +223,11 @@ impl Context {
         let mut internal = internal_guard.unwrap();
 
         let channel_map_ptr: *const pa_channel_map = match map {
-            Some(map) => map as *const pa_channel_map,
+            Some(map) => map,
             None => ptr::null()
         };
-        PulseAudioStream::new(
-            internal.ptr, name, ss, channel_map_ptr)
+
+        PulseAudioStream::new(internal.ptr, name, ss, channel_map_ptr)
     }
 }
 
