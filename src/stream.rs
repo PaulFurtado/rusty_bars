@@ -1,4 +1,5 @@
 #![allow(unstable)]
+#![allow(raw_pointer_derive)]
 
 extern crate libc;
 
@@ -6,7 +7,6 @@ use self::libc::{c_int, c_void, size_t};
 
 use std::{ptr, slice};
 use std::io::IoResult;
-use std::sync::{Arc, Mutex};
 use std::rc::Rc;
 use std::cell::RefCell;
 
@@ -235,17 +235,17 @@ impl<'a> PulseAudioStream<'a> {
     }
 
     pub fn get_raw_ptr(&self) -> *const opaque::pa_stream {
-        let mut internal = self.internal.borrow();
+        let internal = self.internal.borrow();
         internal.pa_stream as *const opaque::pa_stream
     }
 
     /// Return the current fragment from Pulse's record stream.
     /// To return the next fragment, drop_fragment must be called after peeking.
     pub fn peek(&mut self) -> Result<&[u8], PeekError> {
-        let mut internal = self.internal.borrow_mut();
+        let internal = self.internal.borrow_mut();
 
         let mut buf: *mut u8 = ptr::null_mut();
-        let mut bufptr: *mut *mut u8 = &mut buf;
+        let bufptr: *mut *mut u8 = &mut buf;
 
         let mut nbytes: size_t = 0;
 
@@ -269,7 +269,7 @@ impl<'a> PulseAudioStream<'a> {
     /// Drops the current fragment in Pulse's record stream.
     /// Can only be called after peek.
     pub fn drop_fragment(&mut self) -> IoResult<c_int> {
-        let mut internal = self.internal.borrow_mut();
+        let internal = self.internal.borrow_mut();
         Ok(safe::pa_stream_drop(internal.pa_stream))
     }
 
@@ -284,14 +284,14 @@ impl<'a> PulseAudioStream<'a> {
         source_name: Option<&str>,
         buffer_attributes: Option<&pa_buffer_attr>,
         stream_flags: Option<pa_stream_flags_t>) -> Result<c_int, String> {
-        let mut internal = self.internal.borrow_mut();
+        let internal = self.internal.borrow_mut();
         safe::pa_stream_connect_record(
             internal.pa_stream, source_name, buffer_attributes, stream_flags)
     }
 
     /// Disconnect the stream from its source/sink.
     pub fn disconnect(&mut self) -> c_int {
-        let mut internal = self.internal.borrow_mut();
+        let internal = self.internal.borrow_mut();
         safe::pa_stream_disconnect(internal.pa_stream)
     }
 
