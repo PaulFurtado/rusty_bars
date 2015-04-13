@@ -8,7 +8,8 @@ use rust_pulse::pulse::*;
 use rust_pulse::pulse_types::*;
 use rust_pulse::visualizer;
 use rust_pulse::fftw_wrapper;
-
+use std::rc::Rc;
+use std::cell::RefCell;
 
 macro_rules! println_stderr(
     ($($arg:tt)*) => (
@@ -20,62 +21,123 @@ macro_rules! println_stderr(
 );
 
 
-struct VizRunner {
-    mainloop: PulseAudioMainloop,
-    context: Context,
-    fft: fftw_wrapper::AudioFft,
-    viz: visualizer::Visualizer
+#[derive(Clone)]
+struct VizRunner<'a> {
+    internal: Rc<RefCell<VizRunnerInternal<'a>>>
 }
 
 
-impl VizRunner {
-    pub fn new() -> VizRunner {
-        let mainloop = PulseAudioMainloop::new();
-        let context = mainloop.create_context("rs_client");
+impl<'a> VizRunner<'a> {
+    fn new(mainloop: &'a PulseAudioMainloop) ->  VizRunner<'a> {
+        let vzr = VizRunner {
+            internal: Rc::new(RefCell::new(VizRunnerInternal::new(mainloop)))
+        };
+        {
+            //let internal_rc = vzr.internal.clone();
+            let clone = vzr.clone();
+            let mut internal = vzr.internal.borrow_mut();
+            internal.external = Some(clone);
+        }
+        vzr
+    }
 
-        VizRunner {
-            mainloop: mainloop,
+    pub fn connect(&mut self) {
+        let mut internal = self.internal.borrow_mut();
+        println!("sucessful borrow.");
+        internal.connect();
+        println!("connect ran!");
+    }
+
+}
+
+
+
+
+struct VizRunnerInternal<'a> {
+    context: Context<'a>,
+    fft: fftw_wrapper::AudioFft,
+    viz: visualizer::Visualizer,
+    external: Option<VizRunner<'a>>,
+}
+
+
+impl<'a> VizRunnerInternal<'a> {
+    pub fn new(mainloop: &'a PulseAudioMainloop) -> VizRunnerInternal<'a> {
+        let context = mainloop.create_context("rs_client");
+        VizRunnerInternal {
             context: context,
             fft: fftw_wrapper::AudioFft::new(1024, 2),
-            viz: visualizer::Visualizer::new()
+            viz: visualizer::Visualizer::new(),
+            external: None
         }
     }
 
+    pub fn connect(&mut self) {
+        let mut external = self.external.clone().unwrap();
+        self.context.set_state_callback(move |context, state| {
+            match state {
+                pa_context_state::READY => {
+                    external.internal.borrow_mut().on_ready()
+                },
+                _ => {}
+            }
+        });
+
+        self.context.connect(None, pa_context_flags::NOAUTOSPAWN);
+    }
+
+    pub fn on_ready(&mut self) {
+        self.update_sink();
+    }
+
+    pub fn update_sink(&mut self) {
+        let mut external = self.external.clone().unwrap();
+        self.context.get_server_info(move |context, info| {
+            let internal = external.internal.borrow();
+            let external = external.clone();
+            internal.context.get_sink_info_by_name(info.get_default_sink_name(), move |context, info| {
+                match info {
+                    Some(info) => {
+                        let mut internal = external.internal.borrow_mut();
+                        internal.on_new_sink(info.get_monitor_source_name());
+                    },
+                    None => {}
+                }
+            });
+        });
+    }
+
+    pub fn on_new_sink(&mut self, monitor_name: &str) {
+        println_stderr!("new sink: {}", monitor_name);
+    }
 
 }
 
 
 
+fn main_new() {
+    let mainloop = PulseAudioMainloop::new();
+    let mut viz = VizRunner::new(&mainloop);
+    println_stderr!("connect");
+    viz.connect();
+    println_stderr!("starting the loop");
+    mainloop.run();
+}
 
 
 fn main() {
+    main_new();
+    return;
     let mainloop = PulseAudioMainloop::new();
     let mut context = mainloop.create_context("rs_client");
-    context.set_state_callback(move |mut context, state| {
+    /*
+    context.set_state_callback(move |context, state| {
         match state {
             pa_context_state::READY => {
-                println!("calling!");
                 context.get_server_info(move |context, info| {
-                    println!("===================== server_info_callback =======================");
-                    println!("user_name: {}", info.get_user_name());
-                    println!("host_name: {}", info.get_host_name());
-                    println!("server_version: {}", info.get_server_version());
-                    println!("server_name: {}", info.get_server_name());
-                    println!("default_sink_name: {}", info.get_default_sink_name());
-                    println!("default_source_name: {}", info.get_default_source_name());
-                    println!("===================== end server_info_callback =======================");
-                    println!("\n\n");
                     context.get_sink_info_by_name(info.get_default_sink_name(), move |context, info| {
                         match info {
                             Some(info) => {
-                                println!("===================== sink_info_callback =======================");
-                                println!("name: {}", info.get_name());
-                                println!("description: {}", info.get_description());
-                                println!("monitor_source: {}", info.get_monitor_source_name());
-                                println!("monitor_source index: {}", info.monitor_source);
-                                println!("driver: {}", info.get_driver());
-                                println!("===================== end sink_info_callback =======================");
-
                                 let sample_spec = pa_sample_spec {
                                     format:pa_sample_format::PA_SAMPLE_S16LE,
                                     rate: 44100,
@@ -139,6 +201,7 @@ fn main() {
             _ => {}
         }
     });
+    */
     context.connect(None, pa_context_flags::NOAUTOSPAWN);
     mainloop.run();
 }

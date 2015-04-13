@@ -11,6 +11,8 @@ use ext;
 use std::ffi::CString;
 use std::ptr;
 
+use std::rc::Rc;
+use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 
 use pulse_types::*;
@@ -19,19 +21,19 @@ pub use stream;
 use stream::*;
 
 // Types for callback closures
-type StateCallback = FnMut(Context, pa_context_state) + Send;
-type ServerInfoCallback = FnMut(Context, &pa_server_info) + Send;
-type SinkInfoCallback = FnMut(Context, Option<&pa_sink_info>) + Send;
-type SubscriptionCallback = FnMut(Context, c_int, u32) + Send;
-type PaContextSuccessCallback = FnMut(Context, bool) + Send;
+type StateCallback<'a> = FnMut(Context, pa_context_state) + 'a;
+type ServerInfoCallback<'a> = FnMut(Context, &pa_server_info) + 'a;
+type SinkInfoCallback<'a> = FnMut(Context, Option<&pa_sink_info>) + 'a;
+type SubscriptionCallback<'a> = FnMut(Context, c_int, u32) + 'a;
+type PaContextSuccessCallback<'a> = FnMut(Context, bool) + 'a;
 
 
 // Boxed types for callback closures
-type BoxedStateCallback = Box<StateCallback>;
-type BoxedServerInfoCallback = Box<ServerInfoCallback>;
-type BoxedSinkInfoCallback = Box<SinkInfoCallback>;
-type BoxedSubscriptionCallback = Box<SubscriptionCallback>;
-type BoxedPaContextSuccessCallback = Box<PaContextSuccessCallback>;
+type BoxedStateCallback<'a> = Box<StateCallback<'a>>;
+type BoxedServerInfoCallback<'a> = Box<ServerInfoCallback<'a>>;
+type BoxedSinkInfoCallback<'a> = Box<SinkInfoCallback<'a>>;
+type BoxedSubscriptionCallback<'a> = Box<SubscriptionCallback<'a>>;
+type BoxedPaContextSuccessCallback<'a> = Box<PaContextSuccessCallback<'a>>;
 
 
 /// Coverts a pulse error code to a String
@@ -75,14 +77,14 @@ pub fn pa_context_connect(context: *mut opaque::pa_context, server_name: Option<
 
 
 /// A struct which wraps the PulseAudio async main loop.
-pub struct PulseAudioMainloop {
+pub struct PulseAudioMainloop<'a> {
     internal: *mut pa_mainloop
 }
 
 
-impl PulseAudioMainloop {
+impl<'a> PulseAudioMainloop<'a> {
     /// Create a new mainloop.
-    pub fn new() -> PulseAudioMainloop {
+    pub fn new() -> PulseAudioMainloop<'a> {
         PulseAudioMainloop{
             internal: pa_mainloop_new()
         }
@@ -94,7 +96,7 @@ impl PulseAudioMainloop {
     }
 
     //// Creates a new context with this mainloop
-    pub fn create_context(&self, client_name: &str) -> Context {
+    pub fn create_context<'a>(&'a self, client_name: &str) -> Context<'a> {
         Context::new(self, client_name)
     }
 
@@ -107,26 +109,26 @@ impl PulseAudioMainloop {
 }
 
 
-unsafe impl Send for ContextInternal {}
+//unsafe impl Send for ContextInternal {}
 
 
 
 #[derive(Clone)]
-pub struct Context {
-    internal: Arc<Mutex<ContextInternal>>
+pub struct Context<'a> {
+    internal: Rc<RefCell<ContextInternal<'a>>>
 }
 
 
-impl Context {
+impl<'a> Context<'a> {
     /// Get a new PulseAudio context. It's probably easier to get this via the
     /// mainloop.
-    pub fn new(mainloop: &PulseAudioMainloop, client_name: &str) -> Context{
-        let context = Context {
-            internal: Arc::new(Mutex::new(ContextInternal::new(mainloop, client_name))),
+    pub fn new(mainloop: &PulseAudioMainloop, client_name: &str) -> Context<'a> {
+        let mut context = Context {
+            internal: Rc::new(RefCell::new(ContextInternal::new(mainloop, client_name))),
         };
         {
-            let internal_guard = context.internal.lock();
-            let mut internal = internal_guard.unwrap();
+            //let internal_guard = context.internal.lock();
+            let mut internal = context.internal.borrow_mut();
             internal.external = Some(context.clone());
         }
         context
@@ -134,9 +136,9 @@ impl Context {
 
     /// Set the callback for server state. This callback gets called many times.
     /// Do not start sending commands until this returns pa_context_state::READY
-    pub fn set_state_callback<C>(&mut self, cb: C) where C: FnMut(Context, pa_context_state) + Send {
-        let internal_guard = self.internal.lock();
-        let mut internal = internal_guard.unwrap();
+    pub fn set_state_callback<C>(&self, cb: C) where C: FnMut(Context, pa_context_state) + 'a {
+        //let internal_guard = self.internal.lock();
+        let mut internal = self.internal.borrow_mut();
         internal.state_cb = Some(Box::new(cb) as BoxedStateCallback);
         pa_context_set_state_callback(internal.ptr, _state_callback, internal.as_void_ptr());
     }
@@ -147,16 +149,16 @@ impl Context {
     /// 3. Directly after running this method, start the mainloop to start
     ///    getting callbacks.
     pub fn connect(&self, server: Option<&str>, flags: pa_context_flags) {
-        let internal_guard = self.internal.lock();
-        let internal = internal_guard.unwrap();
+        //let internal_guard = self.internal.lock();
+        let mut internal = self.internal.borrow_mut();
         pa_context_connect(internal.ptr, server, flags, None);
     }
 
     /// Gets basic information about the server. See the pa_server_info struct
     /// for more details.
-    pub fn get_server_info<C>(&self, cb: C) where C: FnMut(Context, &pa_server_info), C: Send {
-        let internal_guard = self.internal.lock();
-        let mut internal = internal_guard.unwrap();
+    pub fn get_server_info<C>(&self, cb: C) where C: FnMut(Context, &pa_server_info) + 'a {
+        //let internal_guard = self.internal.lock();
+        let mut internal = self.internal.borrow_mut();
         internal.server_info_cb = Some(Box::new(cb) as BoxedServerInfoCallback);
         pa_context_get_server_info(internal.ptr, _server_info_callback, internal.as_void_ptr());
     }
@@ -167,17 +169,17 @@ impl Context {
     /// element list. You should get two callbacks from this function: one with
     /// the information about the sink, and one with None indicating the end of
     /// the list.
-    pub fn get_sink_info_by_name<C>(&self, name: &str, cb: C) where C: FnMut(Context, Option<&pa_sink_info>), C: Send {
-        let internal_guard = self.internal.lock();
-        let mut internal = internal_guard.unwrap();
+    pub fn get_sink_info_by_name<C>(&self, name: &str, cb: C) where C: FnMut(Context, Option<&pa_sink_info>) + 'a {
+        //let internal_guard = self.internal.lock();
+        let mut internal = self.internal.borrow_mut();
         internal.sink_info_cb = Some(Box::new(cb) as BoxedSinkInfoCallback);
         pa_context_get_sink_info_by_name(internal.ptr, name, _sink_info_callback, internal.as_void_ptr());
     }
 
     /// Adds an event subscription
-    pub fn add_subscription<C>(&self, mask: pa_subscription_mask, cb: C) where C: FnMut(Context, bool), C: Send {
-        let internal_guard = self.internal.lock();
-        let mut internal = internal_guard.unwrap();
+    pub fn add_subscription<C>(&self, mask: pa_subscription_mask, cb: C) where C: FnMut(Context, bool) + 'a {
+        //let internal_guard = self.internal.lock();
+        let mut internal = self.internal.borrow_mut();
         internal.context_success_cb = Some(Box::new(cb) as BoxedPaContextSuccessCallback);
         internal.subscriptions.add(mask);
         let new_mask = internal.subscriptions.get_mask();
@@ -185,9 +187,9 @@ impl Context {
     }
 
     /// Removes an event subscription
-    pub fn remove_subscription<C>(&self, mask: pa_subscription_mask, cb: C) where C: FnMut(Context, bool), C: Send {
-        let internal_guard = self.internal.lock();
-        let mut internal = internal_guard.unwrap();
+    pub fn remove_subscription<C>(&self, mask: pa_subscription_mask, cb: C) where C: FnMut(Context, bool) + 'a {
+        //let internal_guard = self.internal.lock();
+        let mut internal = self.internal.borrow_mut();
         internal.context_success_cb = Some(Box::new(cb) as BoxedPaContextSuccessCallback);
         internal.subscriptions.remove(mask);
         let new_mask = internal.subscriptions.get_mask();
@@ -195,9 +197,9 @@ impl Context {
     }
 
     /// Sets the callback for subscriptions
-    pub fn set_event_callback<C>(&self, cb: C) where C: FnMut(Context, c_int, u32), C: Send {
-        let internal_guard = self.internal.lock();
-        let mut internal = internal_guard.unwrap();
+    pub fn set_event_callback<C>(&self, cb: C) where C: FnMut(Context, c_int, u32) + 'a {
+        //let internal_guard = self.internal.lock();
+        let mut internal = self.internal.borrow_mut();
         internal.event_cb = Some(Box::new(cb) as BoxedSubscriptionCallback);
         pa_context_set_subscribe_callback(internal.ptr, _subscription_event_callback, internal.as_void_ptr());
     }
@@ -209,8 +211,8 @@ impl Context {
     ///    ss: the sample format of the stream
     ///    map: the desired channel
     pub fn create_stream(&self, name: &str, ss: &pa_sample_spec, map: Option<&pa_channel_map>) -> PulseAudioStream {
-        let internal_guard = self.internal.lock();
-        let internal = internal_guard.unwrap();
+        //let internal_guard = self.internal.lock();
+        let mut internal = self.internal.borrow_mut();
 
         let channel_map_ptr: *const pa_channel_map = match map {
             Some(map) => map,
@@ -222,23 +224,23 @@ impl Context {
 }
 
 
-struct ContextInternal {
+struct ContextInternal<'a> {
     /// A pointer to the pa_context object
     ptr: *mut pa_context,
     /// A pointer to our external API
-    external: Option<Context>,
+    external: Option<Context<'a>>,
     /// Callback closure for state changes. Called every time the state changes
-    state_cb: Option<BoxedStateCallback>,
+    state_cb: Option<BoxedStateCallback<'a>>,
     /// Callback closure for get_server_info. Called once per execution of
     /// get_server_info.
-    server_info_cb: Option<BoxedServerInfoCallback>,
+    server_info_cb: Option<BoxedServerInfoCallback<'a>>,
     /// Callback closure for getting sink info.  Called once for for each
     /// element in the list of sinks
-    sink_info_cb: Option<BoxedSinkInfoCallback>,
+    sink_info_cb: Option<BoxedSinkInfoCallback<'a>>,
     /// Called for events
-    event_cb: Option<BoxedSubscriptionCallback>,
+    event_cb: Option<BoxedSubscriptionCallback<'a>>,
     /// Called for event subscription events
-    context_success_cb: Option<BoxedPaContextSuccessCallback>,
+    context_success_cb: Option<BoxedPaContextSuccessCallback<'a>>,
     /// Manages subscriptions to events
     subscriptions: SubscriptionManager,
 }
@@ -246,16 +248,17 @@ struct ContextInternal {
 
 /// Currently the drop method has nothing to trigger it. Need to figure out a
 /// game plan here.
-impl Drop for ContextInternal {
+#[unsafe_destructor]
+impl<'a> Drop for ContextInternal<'a> {
     fn drop(&mut self) {
         println!("drop ContextInternal");
     }
 }
 
 
-impl ContextInternal {
+impl<'a> ContextInternal<'a> {
     /// Never invoke directly. Always go through Context
-    fn new(mainloop: &PulseAudioMainloop, client_name: &str) -> ContextInternal {
+    fn new(mainloop: &PulseAudioMainloop, client_name: &str) -> ContextInternal<'a> {
         ContextInternal{
             ptr: pa_context_new(mainloop.get_raw_mainloop_api(), client_name),
             // TODO: deal with dropping circular reference to external with the Arc
@@ -280,7 +283,7 @@ impl ContextInternal {
     }
 
     /// Get a mutable raw pointer to this object
-    fn as_mut_ptr(&mut self) -> *mut ContextInternal {
+    fn as_mut_ptr(&mut self) -> *mut ContextInternal<'a> {
         self
     }
 
