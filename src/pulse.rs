@@ -221,14 +221,13 @@ impl Context {
     pub fn create_stream(&self, name: &str, ss: &pa_sample_spec, map: Option<&pa_channel_map>) -> PulseAudioStream {
         let internal_guard = self.internal.lock();
         let mut internal = internal_guard.unwrap();
-        let sample_spec_ptr: *const pa_sample_spec =
-            ss as *const pa_sample_spec;
+
         let channel_map_ptr: *const pa_channel_map = match map {
             Some(map) => map as *const pa_channel_map,
             None => ptr::null()
         };
         PulseAudioStream::new(
-            internal.ptr, name, sample_spec_ptr, channel_map_ptr)
+            internal.ptr, name, ss, channel_map_ptr)
     }
 }
 
@@ -425,6 +424,8 @@ extern fn _subscription_success_callback(_: *mut pa_context, success: c_int,  co
 /// audio data available to read.
 extern fn _pa_stream_read_callback(
     _: *mut opaque::pa_stream, nbytes: size_t,  userdata: *mut c_void) {
+    println!("this part gets called");
+
     let stream_internal = unsafe{ &mut * (
         userdata as *mut PulseAudioStreamInternal) };
     stream_internal.read_callback(nbytes);
@@ -543,7 +544,9 @@ pub fn pa_stream_set_read_callback(
 fn pa_stream_new(c: *mut opaque::pa_context, name: &str, ss: *const pa_sample_spec, map: *const pa_channel_map) -> *mut opaque::pa_stream {
     assert!(!c.is_null());
     let name = CString::from_slice(name.as_bytes());
-    return unsafe { ext::stream::pa_stream_new(c, name.as_ptr(), ss, map) };
+    let res = unsafe { ext::stream::pa_stream_new(c, name.as_ptr(), ss, map) };
+    assert!(!res.is_null());
+    res
 }
 
 
