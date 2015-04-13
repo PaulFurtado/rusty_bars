@@ -8,9 +8,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 
 use rust_pulse::fftw_wrapper;
-use rust_pulse::pulse::context::Context;
-use rust_pulse::pulse::mainloop::PulseAudioMainloop;
-use rust_pulse::pulse::stream::PulseAudioStream;
+use rust_pulse::pulse::{Context, PulseAudioMainloop, PulseAudioStream};
 use rust_pulse::pulse::types::*;
 use rust_pulse::visualizer;
 
