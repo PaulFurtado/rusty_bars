@@ -95,7 +95,7 @@ impl<'a> PulseAudioMainloop<'a> {
     }
 
     //// Creates a new context with this mainloop
-    pub fn create_context<'a>(&'a self, client_name: &str) -> Context<'a> {
+    pub fn create_context(&'a self, client_name: &str) -> Context<'a> {
         Context::new(self, client_name)
     }
 

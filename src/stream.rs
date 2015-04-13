@@ -7,13 +7,15 @@ use self::libc::{c_int, c_void, size_t};
 use std::{ptr, slice};
 use std::io::IoResult;
 use std::sync::{Arc, Mutex};
+use std::rc::Rc;
+use std::cell::RefCell;
 
 use pulse_types::*;
 
 
 // Types for callback closures
-pub type PaStreamRequestCallback = FnMut(PulseAudioStream, size_t) + Send; // XXX
-pub type BoxedPaStreamRequestCallback = Box<PaStreamRequestCallback>;
+pub type PaStreamRequestCallback<'a> = FnMut(PulseAudioStream, size_t) + 'a; // XXX
+pub type BoxedPaStreamRequestCallback<'a> = Box<PaStreamRequestCallback<'a>>;
 
 
 mod safe {
@@ -129,17 +131,17 @@ mod safe {
 
 
 /// Holds members and callbacks of PulseAudioStream.
-struct PulseAudioStreamInternal {
+struct PulseAudioStreamInternal<'a> {
     /// The underlying pulse audio stream
     pa_stream: *mut opaque::pa_stream,
     /// A pointer to the external PulseAudioStream
-    external: Option<PulseAudioStream>,
+    external: Option<PulseAudioStream<'a>>,
     /// Called when the stream has data available for reading
-    read_cb: Option<BoxedPaStreamRequestCallback>
+    read_cb: Option<BoxedPaStreamRequestCallback<'a>>
 }
 
 
-impl PulseAudioStreamInternal {
+impl<'a> PulseAudioStreamInternal<'a> {
     /// Never invoke this. Use PulseAudioStream instead.
     fn new(stream: *mut opaque::pa_stream) -> Self {
         PulseAudioStreamInternal {
@@ -168,13 +170,14 @@ impl PulseAudioStreamInternal {
     }
 
     /// Get a mutable raw pointer to this object
-    pub fn as_mut_ptr(&mut self) -> *mut PulseAudioStreamInternal {
+    pub fn as_mut_ptr(&mut self) -> *mut PulseAudioStreamInternal<'a> {
         self
     }
 }
 
 
-impl Drop for PulseAudioStreamInternal {
+#[unsafe_destructor]
+impl<'a> Drop for PulseAudioStreamInternal<'a> {
     /// TODO: profile this.
     fn drop(&mut self) {
         println!("drop pulse audio stream internal");
@@ -197,14 +200,14 @@ pub enum PeekError {
 /// Represents a Pulse Audio stream.
 /// Can be used to write to a sink or read from a source.
 #[derive(Clone)]
-pub struct PulseAudioStream {
-    internal: Arc<Mutex<PulseAudioStreamInternal>>,
+pub struct PulseAudioStream<'a> {
+    internal: Rc<RefCell<PulseAudioStreamInternal<'a>>>,
     /// The last position of the stream's read buffer.
     _last_ptr: *const u8,
 }
 
 
-impl PulseAudioStream {
+impl<'a> PulseAudioStream<'a> {
     /// Create a new stream on a context.
     /// Args:
     ///     context: the pulse audio context to attach to
@@ -220,13 +223,12 @@ impl PulseAudioStream {
 
 
         let stream = PulseAudioStream {
-            internal: Arc::new(Mutex::new(internal)),
+            internal: Rc::new(RefCell::new(internal)),
             _last_ptr: ptr::null()
         };
 
         {
-            let internal_guard = stream.internal.lock();
-            let mut internal = internal_guard.unwrap();
+            let mut internal = stream.internal.borrow_mut();
             internal.external = Some(stream.clone());
         }
         stream
@@ -235,8 +237,7 @@ impl PulseAudioStream {
     /// Return the current fragment from Pulse's record stream.
     /// To return the next fragment, drop_fragment must be called after peeking.
     pub fn peek(&mut self) -> Result<&[u8], PeekError> {
-        let internal_guard = self.internal.lock();
-        let internal = internal_guard.unwrap();
+        let mut internal = self.internal.borrow_mut();
 
         let mut buf: *mut u8 = ptr::null_mut();
         let mut bufptr: *mut *mut u8 = &mut buf;
@@ -263,8 +264,7 @@ impl PulseAudioStream {
     /// Drops the current fragment in Pulse's record stream.
     /// Can only be called after peek.
     pub fn drop_fragment(&mut self) -> IoResult<c_int> {
-        let internal_guard = self.internal.lock();
-        let internal = internal_guard.unwrap();
+        let mut internal = self.internal.borrow_mut();
         Ok(safe::pa_stream_drop(internal.pa_stream))
     }
 
@@ -279,23 +279,20 @@ impl PulseAudioStream {
         source_name: Option<&str>,
         buffer_attributes: Option<&pa_buffer_attr>,
         stream_flags: Option<pa_stream_flags_t>) -> Result<c_int, String> {
-        let internal_guard = self.internal.lock();
-        let internal = internal_guard.unwrap();
+        let mut internal = self.internal.borrow_mut();
         safe::pa_stream_connect_record(
             internal.pa_stream, source_name, buffer_attributes, stream_flags)
     }
 
     /// Disconnect the stream from its source/sink.
     pub fn disconnect(&mut self) {
-        let internal_guard = self.internal.lock();
-        let internal = internal_guard.unwrap();
+        let mut internal = self.internal.borrow_mut();
         safe::pa_stream_disconnect(internal.pa_stream)
     }
 
     /// Sets the read callback
-    pub fn set_read_callback<C>(&mut self, cb: C) where C: FnMut(PulseAudioStream, size_t), C: Send {
-        let internal_guard = self.internal.lock();
-        let mut internal = internal_guard.unwrap();
+    pub fn set_read_callback<C>(&mut self, cb: C) where C: FnMut(PulseAudioStream, size_t) + 'a {
+        let mut internal = self.internal.borrow_mut();
         internal.read_cb = Some(Box::new(cb) as BoxedPaStreamRequestCallback);
         safe::pa_stream_set_read_callback(
             internal.pa_stream,
@@ -304,13 +301,10 @@ impl PulseAudioStream {
     }
 }
 
-
-impl Drop for PulseAudioStream {
+#[unsafe_destructor]
+impl<'a> Drop for PulseAudioStream<'a> {
     fn drop(&mut self) {
         // TODO
         //self.disconnect()
     }
 }
-
-
-unsafe impl Send for PulseAudioStreamInternal {}
