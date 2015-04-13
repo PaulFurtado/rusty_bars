@@ -1,13 +1,9 @@
 #![allow(unstable)]
 
-// TODO: Automatically get default sink
-
 extern crate libc;
 extern crate rust_pulse;
 
-use self::libc::{c_int};
-
-
+use self::libc::c_int;
 use rust_pulse::pulse::*;
 use rust_pulse::pulse_types::*;
 use rust_pulse::visualizer;
@@ -30,7 +26,6 @@ fn main() {
     let mainloop = PulseAudioMainloop::new();
     let mut context = mainloop.create_context("rs_client");
     context.set_state_callback(move |mut context, state| {
-        println!("state: {}", state as c_int);
         match state {
             pa_context_state::READY => {
                 println!("calling!");
