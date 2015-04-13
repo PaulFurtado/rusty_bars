@@ -3,11 +3,12 @@
 extern crate libc;
 extern crate rust_pulse;
 
-use self::libc::c_int;
+use self::libc::{c_int, size_t};
 use rust_pulse::pulse::*;
 use rust_pulse::pulse_types::*;
 use rust_pulse::visualizer;
 use rust_pulse::fftw_wrapper;
+use rust_pulse::stream::PulseAudioStream;
 use std::rc::Rc;
 use std::cell::RefCell;
 
@@ -109,7 +110,28 @@ impl<'a> VizRunnerInternal<'a> {
 
     pub fn on_new_sink(&mut self, monitor_name: &str) {
         println_stderr!("new sink: {}", monitor_name);
+        let sample_spec = pa_sample_spec {
+            format:pa_sample_format::PA_SAMPLE_S16LE,
+            rate: 44100,
+            channels: 2
+        };
+
+        let mut stream = self.context.create_stream("rs_client", &sample_spec, None);
+
+        let mut external = self.external.clone().unwrap();
+
+        stream.set_read_callback(move |mut stream, nbytes| {
+            let internal = external.internal.borrow_mut();
+            internal.stream_read_callback(stream, nbytes);
+        });
+
     }
+
+    pub fn stream_read_callback(&mut self, stream: PulseAudioStream, nbytes: size_t) {
+        println!("got data");
+
+    }
+
 
 }
 
