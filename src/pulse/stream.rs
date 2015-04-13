@@ -174,15 +174,12 @@ impl<'a> PulseAudioStreamInternal<'a> {
     }
 }
 
-
-#[unsafe_destructor]
+#[unsafe_destructor] // unsafe because of the lifetimes
 impl<'a> Drop for PulseAudioStreamInternal<'a> {
-    /// TODO: profile this.
     fn drop(&mut self) {
-        println!("drop pulse audio stream internal");
+        safe::pa_stream_disconnect(self.pa_stream);
     }
 }
-
 
 /// Represents errors that could occur while reading data from a
 /// PulseAudioStream.
@@ -302,13 +299,5 @@ impl<'a> PulseAudioStream<'a> {
             internal.pa_stream,
             safe::_pa_stream_read_callback,
             internal.as_void_ptr());
-    }
-}
-
-#[unsafe_destructor]
-impl<'a> Drop for PulseAudioStream<'a> {
-    fn drop(&mut self) {
-        // TODO
-        //self.disconnect()
     }
 }

@@ -27,8 +27,7 @@ type PaContextSuccessCallback<'a> = FnMut(Context, bool) + 'a;
 
 
 /// Boxed types for callback closures.
-type
- BoxedStateCallback<'a> = Box<StateCallback<'a>>;
+type BoxedStateCallback<'a> = Box<StateCallback<'a>>;
 type BoxedServerInfoCallback<'a> = Box<ServerInfoCallback<'a>>;
 type BoxedSinkInfoCallback<'a> = Box<SinkInfoCallback<'a>>;
 type BoxedSubscriptionCallback<'a> = Box<SubscriptionCallback<'a>>;
@@ -167,7 +166,6 @@ impl<'a> ContextInternal<'a> {
     fn new(mainloop: &PulseAudioMainloop, client_name: &str) -> ContextInternal<'a> {
         ContextInternal{
             ptr: pa_context_new(mainloop.get_raw_mainloop_api(), client_name),
-            // TODO: deal with dropping circular reference to external with the Arc
             external: None,
             state_cb: None,
             server_info_cb: None,
@@ -244,7 +242,7 @@ impl<'a> ContextInternal<'a> {
 #[unsafe_destructor]
 impl<'a> Drop for ContextInternal<'a> {
     fn drop(&mut self) {
-        println!("drop ContextInternal");
+        // TODO
     }
 }
 
@@ -310,6 +308,7 @@ pub fn pa_context_get_server_info(context: *mut opaque::pa_context,
     }
 }
 
+
 /// A safe interface to pa_context_new
 pub fn pa_context_new(mainloop_api: *mut opaque::pa_mainloop_api, client_name: &str) -> *mut opaque::pa_context {
     assert!(!mainloop_api.is_null());
@@ -318,8 +317,6 @@ pub fn pa_context_new(mainloop_api: *mut opaque::pa_mainloop_api, client_name: &
     assert!(!context.is_null());
     return context;
 }
-
-
 
 
 /// Subscribe to an event

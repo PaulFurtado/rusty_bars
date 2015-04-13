@@ -35,10 +35,10 @@ impl<'a> PulseAudioMainloop<'a> {
     }
 
     /// Run the mainloop.
-    pub fn run(&self) {
-        let mut mainloop_res: c_int = 0;
-        pa_mainloop_run(self.internal, &mut mainloop_res);
-        // TODO: error handling
+    pub fn run(&self) -> c_int {
+        let mut result: c_int = 0;
+        pa_mainloop_run(self.internal, &mut result);
+        result
     }
 }
 
