@@ -23,32 +23,26 @@ macro_rules! println_stderr(
 
 
 #[derive(Clone)]
+/// The culmination of all of the visualizer parts
 struct VizRunner<'a> {
     internal: Rc<RefCell<VizRunnerInternal<'a>>>
 }
 
 
 impl<'a> VizRunner<'a> {
+    /// Create a new visuaizer
     fn new(mainloop: &'a PulseAudioMainloop) ->  VizRunner<'a> {
         let vzr = VizRunner {
             internal: Rc::new(RefCell::new(VizRunnerInternal::new(mainloop)))
         };
         {
-            //let internal_rc = vzr.internal.clone();
             let clone = vzr.clone();
             let mut internal = vzr.internal.borrow_mut();
             internal.external = Some(clone);
+            internal.connect();
         }
         vzr
     }
-
-    pub fn connect(&mut self) {
-        let mut internal = self.internal.borrow_mut();
-        println!("sucessful borrow.");
-        internal.connect();
-        println!("connect ran!");
-    }
-
 }
 
 
@@ -64,7 +58,8 @@ struct VizRunnerInternal<'a> {
 
 
 impl<'a> VizRunnerInternal<'a> {
-    pub fn new(mainloop: &'a PulseAudioMainloop) -> VizRunnerInternal<'a> {
+    /// Create a new instance of the VizRunnerInternal struct
+    fn new(mainloop: &'a PulseAudioMainloop) -> VizRunnerInternal<'a> {
         let context = mainloop.create_context("rs_client");
         VizRunnerInternal {
             context: context,
@@ -75,8 +70,8 @@ impl<'a> VizRunnerInternal<'a> {
         }
     }
 
-
-    pub fn subscribe_to_sink_changes(&mut self) {
+    /// Subscribe to the default sink changing on the server
+    fn subscribe_to_sink_changes(&mut self) {
         let mut external = self.external.clone().unwrap();
         self.context.set_event_callback(move |context, event, index| {
             let facility = event & (pa_subscription_event_type::FACILITY_MASK as c_int);
@@ -98,7 +93,8 @@ impl<'a> VizRunnerInternal<'a> {
 
     }
 
-    pub fn connect(&mut self) {
+    /// Connect to PulseAudio
+    fn connect(&mut self) {
         let mut external = self.external.clone().unwrap();
         self.context.set_state_callback(move |context, state| {
             match state {
@@ -112,12 +108,14 @@ impl<'a> VizRunnerInternal<'a> {
         self.context.connect(None, pa_context_flags::NOAUTOSPAWN);
     }
 
-    pub fn on_ready(&mut self) {
+    /// Callled when the context is ready
+    fn on_ready(&mut self) {
         self.update_sink();
         self.subscribe_to_sink_changes();
     }
 
-    pub fn update_sink(&mut self) {
+    /// Gets the monitor for the current default sink and then calls set_sink
+    fn update_sink(&mut self) {
         let mut external = self.external.clone().unwrap();
         self.context.get_server_info(move |context, info| {
             let internal = external.internal.borrow();
@@ -126,7 +124,7 @@ impl<'a> VizRunnerInternal<'a> {
                 match info {
                     Some(info) => {
                         let mut internal = external.internal.borrow_mut();
-                        internal.on_new_sink(info.get_monitor_source_name());
+                        internal.set_sink(info.get_monitor_source_name());
                     },
                     None => {}
                 }
@@ -134,8 +132,8 @@ impl<'a> VizRunnerInternal<'a> {
         });
     }
 
-    /// Called whenever we change the sink
-    pub fn on_new_sink(&mut self, monitor_name: &str) {
+    /// Switches to a new sink
+    fn set_sink(&mut self, monitor_name: &str) {
         match self.stream {
             Some(ref mut stream) => { stream.disconnect(); },
             None => {}
@@ -161,27 +159,40 @@ impl<'a> VizRunnerInternal<'a> {
     }
 
     /// Called whenever the FFT has enough data to run a frame of the visualizer
-    pub fn on_fft_frame_ready(&mut self) {
+    fn on_fft_frame_ready(&mut self) {
         self.fft.execute();
         self.fft.compute_output();
         self.viz.render_frame(self.fft.get_output()).unwrap();
     }
 
-    /// Called whenever the stream is ready to be read.
-    pub fn stream_read_callback(&mut self, mut stream: PulseAudioStream, nbytes: size_t) {
-        // Ignore the callback if the stream just changed.
+    /// Handles a stale stream and returns true if the stream was stale
+    /// A stale stream can occur when switching streams before the current
+    /// stream was in the "ready" state. Rather than wasting waiting for the
+    /// stream to reach the ready state only to disconnect it, this will get
+    /// called the first time the stream has data available and disconnect it
+    /// then.
+    fn handle_stale_stream(&mut self, stream: &mut PulseAudioStream) -> bool {
         match self.stream {
             Some(ref s) => {
                 if s.get_raw_ptr() != stream.get_raw_ptr() {
                     // disconnect frequently fails if the stream is in the wrong state,
                     // so if we got data for a stale stream, try disconnecting it again
                     stream.disconnect();
-                    return;
+                    true
+                } else {
+                    false
                 }
             },
             None => {
-                return;
+                false
             }
+        }
+    }
+
+    /// Handle the callback from PulseAudio telling us that stream data is ready
+    fn stream_read_callback(&mut self, mut stream: PulseAudioStream, nbytes: size_t) {
+        if self.handle_stale_stream(&mut stream) {
+            return
         }
 
         match stream.peek() {
@@ -197,6 +208,7 @@ impl<'a> VizRunnerInternal<'a> {
             },
             Err(_) => return
         }
+
         stream.drop_fragment().unwrap();
     }
 }
@@ -206,8 +218,5 @@ impl<'a> VizRunnerInternal<'a> {
 fn main() {
     let mainloop = PulseAudioMainloop::new();
     let mut viz = VizRunner::new(&mainloop);
-    println_stderr!("connecting");
-    viz.connect();
-    println_stderr!("starting the loop");
     mainloop.run();
 }
