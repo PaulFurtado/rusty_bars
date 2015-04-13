@@ -22,6 +22,13 @@ macro_rules! println_stderr(
 );
 
 
+const DEFAULT_SAMPLE_SPEC: pa_sample_spec = pa_sample_spec {
+    format:pa_sample_format::PA_SAMPLE_S16LE,
+    rate: 44100,
+    channels: 2
+};
+
+
 #[derive(Clone)]
 /// The culmination of all of the visualizer parts
 struct VizRunner<'a> {
@@ -72,8 +79,9 @@ impl<'a> VizRunnerInternal<'a> {
 
     /// Subscribe to the default sink changing on the server
     fn subscribe_to_sink_changes(&mut self) {
-        let mut external = self.external.clone().unwrap();
-        self.context.set_event_callback(move |context, event, index| {
+        let external = self.external.clone().unwrap();
+
+        self.context.set_event_callback(move |_, event, _| {
             let facility = event & (pa_subscription_event_type::FACILITY_MASK as c_int);
             let ev_type = event & (pa_subscription_event_type::TYPE_MASK as c_int);
 
@@ -85,18 +93,17 @@ impl<'a> VizRunnerInternal<'a> {
             }
         });
 
-        self.context.add_subscription(pa_subscription_mask::SERVER, move |context, success| {
+        self.context.add_subscription(pa_subscription_mask::SERVER, move |_, success| {
             if !success {
                 println_stderr!("failed to subscribe to server changes!");
             }
         });
-
     }
 
     /// Connect to PulseAudio
     fn connect(&mut self) {
-        let mut external = self.external.clone().unwrap();
-        self.context.set_state_callback(move |context, state| {
+        let external = self.external.clone().unwrap();
+        self.context.set_state_callback(move |_, state| {
             match state {
                 pa_context_state::READY => {
                     external.internal.borrow_mut().on_ready()
@@ -116,11 +123,11 @@ impl<'a> VizRunnerInternal<'a> {
 
     /// Gets the monitor for the current default sink and then calls set_sink
     fn update_sink(&mut self) {
-        let mut external = self.external.clone().unwrap();
-        self.context.get_server_info(move |context, info| {
+        let external = self.external.clone().unwrap();
+        self.context.get_server_info(move |_, info| {
             let internal = external.internal.borrow();
             let external = external.clone();
-            internal.context.get_sink_info_by_name(info.get_default_sink_name(), move |context, info| {
+            internal.context.get_sink_info_by_name(info.get_default_sink_name(), move |_, info| {
                 match info {
                     Some(info) => {
                         let mut internal = external.internal.borrow_mut();
@@ -140,21 +147,14 @@ impl<'a> VizRunnerInternal<'a> {
         }
         self.stream = None;
 
-        // TODO: sample spec should be constant
-        let sample_spec = pa_sample_spec {
-            format:pa_sample_format::PA_SAMPLE_S16LE,
-            rate: 44100,
-            channels: 2
-        };
+        let mut stream = self.context.create_stream("rs_client", &DEFAULT_SAMPLE_SPEC, None);
+        let external = self.external.clone().unwrap();
 
-        let mut stream = self.context.create_stream("rs_client", &sample_spec, None);
-        let mut external = self.external.clone().unwrap();
-        println_stderr!("new stream addr: {:x}", stream.get_raw_ptr() as usize);
-        stream.set_read_callback(move |mut stream, nbytes| {
+        stream.set_read_callback(move |stream, nbytes| {
             let mut internal = external.internal.borrow_mut();
             internal.stream_read_callback(stream, nbytes);
         });
-        stream.connect_record(Some(monitor_name), None, None);
+        stream.connect_record(Some(monitor_name), None, None).unwrap();
         self.stream = Some(stream);
     }
 
@@ -190,7 +190,7 @@ impl<'a> VizRunnerInternal<'a> {
     }
 
     /// Handle the callback from PulseAudio telling us that stream data is ready
-    fn stream_read_callback(&mut self, mut stream: PulseAudioStream, nbytes: size_t) {
+    fn stream_read_callback(&mut self, mut stream: PulseAudioStream, _: size_t) {
         if self.handle_stale_stream(&mut stream) {
             return
         }
@@ -198,7 +198,6 @@ impl<'a> VizRunnerInternal<'a> {
         match stream.peek() {
             Ok(data) => {
                 let mut fed_count: usize = 0;
-                let mut iterations: usize = 0;
                 while fed_count < data.len() {
                     fed_count += self.fft.feed_u8_data(data);
                     if fed_count < data.len() {
@@ -217,6 +216,6 @@ impl<'a> VizRunnerInternal<'a> {
 
 fn main() {
     let mainloop = PulseAudioMainloop::new();
-    let mut viz = VizRunner::new(&mainloop);
+    VizRunner::new(&mainloop);
     mainloop.run();
 }

@@ -177,7 +177,7 @@ impl Visualizer {
 
         for (y, row) in self.rows.iter_mut().enumerate().rev() {
             for (x, val) in row.iter_mut().enumerate() {
-                *val = (if x >= scaled.len() {
+                *val = if x >= scaled.len() {
                     BORDER_CHAR
                 } else {
                     let val = scaled[x];
@@ -186,7 +186,7 @@ impl Visualizer {
                     } else {
                         EMPTY_CHAR
                     }
-                });
+                };
             }
 
             match self.win.addbytes((self.height - y -1) as c_int, 0, row) {
