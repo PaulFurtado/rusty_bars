@@ -2,9 +2,10 @@
 #![allow(dead_code)]
 
 extern crate libc;
-use self::libc::{c_int, c_char, c_void};
+pub use self::libc::{c_int, c_char, c_void};
 
-use pulse_types::*;
+pub use pulse::types::*;
+
 
 #[link(name="pulse")]
 extern {
@@ -93,7 +94,7 @@ extern {
 pub mod stream {
     extern crate libc;
     use self::libc::{c_void, c_char, c_int, size_t};
-    use pulse_types::*;
+    use pulse::types::*;
 
     #[link(name="pulse")]
     extern {

@@ -1,6 +1,6 @@
 #![allow(unstable)]
 
-/// This module contains a Rust interface to PulseAudio's C API.
+/// A module for connecting to a PulseAudio server.
 
 extern crate libc;
 
@@ -12,9 +12,10 @@ use std::ffi::CString;
 use std::ptr;
 use std::rc::Rc;
 
-use ext;
-use pulse_types::*;
-use stream::{PulseAudioStream};
+use pulse::ext;
+use pulse::mainloop::PulseAudioMainloop;
+pub use pulse::stream::PulseAudioStream;
+use pulse::types::*;
 
 
 /// Types for callback closures
@@ -33,78 +34,7 @@ type BoxedSubscriptionCallback<'a> = Box<SubscriptionCallback<'a>>;
 type BoxedPaContextSuccessCallback<'a> = Box<PaContextSuccessCallback<'a>>;
 
 
-/// Convert a pulse error code to a String
-fn pa_err_to_string(err: c_int) -> Result<(), String> {
-    if err == 0 {
-        Ok(())
-    } else {
-        unsafe {
-            let err_msg_ptr: *const c_char = ext::pa_strerror(err);
-            let size = strlen(err_msg_ptr) as usize;
-            let slice: Vec<u8> = Vec::from_raw_buf((err_msg_ptr as *const u8), size);
-            Err(String::from_utf8(slice).unwrap())
-        }
-    }
-}
-
-
-/// A safe wrapper for pa_context_connect
-fn pa_context_connect(context: *mut opaque::pa_context, server_name: Option<&str>,
-    flags: enums::pa_context_flags, spawn_api: Option<*const opaque::pa_spawn_api>) {
-
-    assert!(!context.is_null());
-
-    let server: *const c_char = match server_name {
-        None => ptr::null(),
-        Some(name) => CString::from_slice(name.as_bytes()).as_ptr()
-    };
-
-    let spawn_api_ptr: *const opaque::pa_spawn_api = match spawn_api {
-        Some(api_ptr) => {
-            assert!(!api_ptr.is_null());
-            api_ptr
-        },
-        None => ptr::null()
-    };
-
-    let res = unsafe { ext::pa_context_connect(context, server, flags, spawn_api_ptr) };
-    assert!(res == 0);
-}
-
-
-/// A struct which wraps the PulseAudio async main loop.
-pub struct PulseAudioMainloop<'a> {
-    internal: *mut pa_mainloop
-}
-
-
-impl<'a> PulseAudioMainloop<'a> {
-    /// Create a new mainloop.
-    pub fn new() -> PulseAudioMainloop<'a> {
-        PulseAudioMainloop{
-            internal: pa_mainloop_new()
-        }
-    }
-
-    /// Helper method to get the raw mainloop api
-    fn get_raw_mainloop_api(&self) -> *mut pa_mainloop_api {
-        pa_mainloop_get_api(self.internal)
-    }
-
-    //// Creates a new context with this mainloop
-    pub fn create_context(&'a self, client_name: &str) -> Context<'a> {
-        Context::new(self, client_name)
-    }
-
-    /// Run the mainloop.
-    pub fn run(&self) {
-        let mut mainloop_res: c_int = 0;
-        pa_mainloop_run(self.internal, &mut mainloop_res);
-        // TODO: error handling
-    }
-}
-
-
+/// Represents a connection to a PulseAudio server.
 #[derive(Clone)]
 pub struct Context<'a> {
     internal: Rc<RefCell<ContextInternal<'a>>>
@@ -188,7 +118,7 @@ impl<'a> Context<'a> {
         pa_context_set_subscribe_callback(internal.ptr, _subscription_event_callback, internal.as_void_ptr());
     }
 
-    /// Create an unconnected PulseAudioStream from this server.
+    /// Create an unconnected PulseAudioStream on this server.
     ///
     /// Args:
     ///    name: A name for this stream.
@@ -318,41 +248,90 @@ impl<'a> Drop for ContextInternal<'a> {
 }
 
 
-/// Represents subscribed events on a Context.
-/// An event type needs a subscription before its callback is triggered.
-struct SubscriptionManager {
-    mask: c_int,
+/// A safe interface to pa_context_set_state_callback
+pub fn pa_context_set_state_callback(context: *mut opaque::pa_context,
+    cb: cb::pa_context_notify_cb_t, userdata: *mut c_void) {
+    assert!(!context.is_null());
+    unsafe { ext::pa_context_set_state_callback(context, cb, userdata) };
 }
 
 
-impl SubscriptionManager {
-    /// Create a new SubscriptionManager
-    fn new() -> SubscriptionManager {
-        SubscriptionManager {
-            mask: 0,
-        }
-    }
+/// A safe wrapper for pa_context_connect
+fn pa_context_connect(context: *mut opaque::pa_context, server_name: Option<&str>,
+    flags: enums::pa_context_flags, spawn_api: Option<*const opaque::pa_spawn_api>) {
 
-    /// Get the current subscription mask
-    pub fn get_mask(&self) -> c_int {
-        self.mask
-    }
+    assert!(!context.is_null());
 
-    /// Add a subscription
-    pub fn add(&mut self, sub: pa_subscription_mask) {
-        self.mask |= sub as c_int;
-    }
+    let server: *const c_char = match server_name {
+        None => ptr::null(),
+        Some(name) => CString::from_slice(name.as_bytes()).as_ptr()
+    };
 
-    /// Remove a subscription
-    pub fn remove(&mut self, sub: pa_subscription_mask) {
-        self.mask &= !(sub as c_int);
-    }
+    let spawn_api_ptr: *const opaque::pa_spawn_api = match spawn_api {
+        Some(api_ptr) => {
+            assert!(!api_ptr.is_null());
+            api_ptr
 
-    /// Check iof a subscription is enabled
-    pub fn is_enabled(&self, sub: pa_subscription_mask) -> bool {
-        let sub_int = sub as c_int;
-        (self.mask & sub_int) == sub_int
+        },
+        None => ptr::null()
+    };
+
+    let res = unsafe { ext::pa_context_connect(context, server, flags, spawn_api_ptr) };
+    assert!(res == 0);
+}
+
+
+/// A rust wrapper around pa_context_disconnect.
+/// Immediately/synchronously disconnect from the PulseAudio server.
+pub fn pa_context_disconnect(context: *mut opaque::pa_context) {
+    assert!(!context.is_null());
+    unsafe { ext::pa_context_disconnect(context) };
+}
+
+
+/// Gets sink info by the sink's name
+pub fn pa_context_get_sink_info_by_name(c: *mut pa_context, name: &str, cb: pa_sink_info_cb_t, userdata: *mut c_void) {
+    assert!(!c.is_null());
+    let name = CString::from_slice(name.as_bytes());
+    unsafe{ ext::pa_context_get_sink_info_by_name(c, name.as_ptr(), cb, userdata) };
+}
+
+
+/// A rust wrapper around pa_context_get_server_info
+pub fn pa_context_get_server_info(context: *mut opaque::pa_context,
+    cb: cb::pa_server_info_cb_t, userdata: *mut c_void) -> Option<*mut opaque::pa_operation> {
+    assert!(!context.is_null());
+    let result = unsafe{ ext::pa_context_get_server_info(context, cb, userdata) };
+    if result.is_null() {
+        None
+    } else {
+        Some(result)
     }
+}
+
+/// A safe interface to pa_context_new
+pub fn pa_context_new(mainloop_api: *mut opaque::pa_mainloop_api, client_name: &str) -> *mut opaque::pa_context {
+    assert!(!mainloop_api.is_null());
+    let client_name_c = CString::from_slice(client_name.as_bytes());
+    let context = unsafe{ ext::pa_context_new(mainloop_api, client_name_c.as_ptr()) };
+    assert!(!context.is_null());
+    return context;
+}
+
+
+
+
+/// Subscribe to an event
+pub fn pa_context_subscribe(c: *mut pa_context, m: c_int, cb: pa_context_success_cb_t, userdata: *mut c_void) {
+    assert!(!c.is_null());
+    unsafe{ ext::pa_context_subscribe(c, m, cb, userdata) };
+}
+
+
+/// Set the callback for all subscriptions
+pub fn pa_context_set_subscribe_callback(c: *mut pa_context, cb: pa_context_subscribe_cb_t, userdata: *mut c_void) {
+    assert!(!c.is_null());
+    unsafe{ ext::pa_context_set_subscribe_callback(c, cb, userdata) };
 }
 
 
@@ -390,102 +369,4 @@ extern fn _subscription_event_callback(_: *mut pa_context, t: c_int, idx: u32, c
 extern fn _subscription_success_callback(_: *mut pa_context, success: c_int,  context: *mut c_void) {
     let context_internal = unsafe{ &mut * (context as *mut ContextInternal) };
     context_internal.subscription_success_callback(success==1);
-}
-
-
-
-/// A safe interface to pa_context_set_state_callback
-pub fn pa_context_set_state_callback(context: *mut opaque::pa_context,
-    cb: cb::pa_context_notify_cb_t, userdata: *mut c_void) {
-    assert!(!context.is_null());
-    unsafe { ext::pa_context_set_state_callback(context, cb, userdata) };
-}
-
-/// A rust wrapper around pa_context_disconnect.
-/// Immediately/synchronously disconnect from the PulseAudio server.
-pub fn pa_context_disconnect(context: *mut opaque::pa_context) {
-    assert!(!context.is_null());
-    unsafe { ext::pa_context_disconnect(context) };
-}
-
-/// A rust wrapper around pa_mainloop_run
-pub fn pa_mainloop_run(mainloop: *mut opaque::pa_mainloop, result: &mut c_int) {
-    assert!(!mainloop.is_null());
-    let res = unsafe{ ext::pa_mainloop_run(mainloop, result as *mut c_int) };
-    assert!(res == 0);
-}
-
-/// A rust wrapper around pa_context_get_state
-pub fn pa_context_get_state(context: *mut opaque::pa_context) -> enums::pa_context_state {
-    assert!(!context.is_null());
-    unsafe{ ext::pa_context_get_state(context) }
-}
-
-
-/// A rust wrapper around pa_context_get_sink_info_list
-pub fn pa_context_get_sink_info_list(context: *mut opaque::pa_context,
-    callback: cb::pa_sink_info_cb_t, userdata: *mut c_void) -> Option<*mut opaque::pa_operation> {
-
-    assert!(!context.is_null());
-    let result = unsafe{ ext::pa_context_get_sink_info_list(context, callback, userdata) };
-    if result.is_null() {
-        None
-    } else {
-        Some(result)
-    }
-}
-
-/// A rust wrapper around pa_context_get_server_info
-pub fn pa_context_get_server_info(context: *mut opaque::pa_context,
-    cb: cb::pa_server_info_cb_t, userdata: *mut c_void) -> Option<*mut opaque::pa_operation> {
-    assert!(!context.is_null());
-    let result = unsafe{ ext::pa_context_get_server_info(context, cb, userdata) };
-    if result.is_null() {
-        None
-    } else {
-        Some(result)
-    }
-}
-
-/// A safe interface to pa_mainloop_get_api
-pub fn pa_mainloop_get_api(mainloop: *mut opaque::pa_mainloop) -> *mut opaque::pa_mainloop_api {
-    assert!(!mainloop.is_null());
-    let mainloop_api = unsafe { ext::pa_mainloop_get_api(mainloop) };
-    assert!(!mainloop_api.is_null());
-    return mainloop_api;
-}
-
-/// A safe interface to pa_context_new
-pub fn pa_context_new(mainloop_api: *mut opaque::pa_mainloop_api, client_name: &str) -> *mut opaque::pa_context {
-    assert!(!mainloop_api.is_null());
-    let client_name_c = CString::from_slice(client_name.as_bytes());
-    let context = unsafe{ ext::pa_context_new(mainloop_api, client_name_c.as_ptr()) };
-    assert!(!context.is_null());
-    return context;
-}
-
-/// A safe interface to pa_mainloop_new
-pub fn pa_mainloop_new() -> *mut opaque::pa_mainloop {
-    let mainloop = unsafe{ ext::pa_mainloop_new() };
-    assert!(!mainloop.is_null());
-    return mainloop;
-}
-
-/// Gets sink info by the sink's name
-pub fn pa_context_get_sink_info_by_name(c: *mut pa_context, name: &str, cb: pa_sink_info_cb_t, userdata: *mut c_void) {
-    assert!(!c.is_null());
-    let name = CString::from_slice(name.as_bytes());
-    unsafe{ ext::pa_context_get_sink_info_by_name(c, name.as_ptr(), cb, userdata) };
-}
-
-/// Subscribe to an event
-pub fn pa_context_subscribe(c: *mut pa_context, m: c_int, cb: pa_context_success_cb_t, userdata: *mut c_void) {
-    assert!(!c.is_null());
-    unsafe{ ext::pa_context_subscribe(c, m, cb, userdata) };
-}
-
-/// Set the callback for all subscriptions
-pub fn pa_context_set_subscribe_callback(c: *mut pa_context, cb: pa_context_subscribe_cb_t, userdata: *mut c_void) {
-    assert!(!c.is_null());
-    unsafe{ ext::pa_context_set_subscribe_callback(c, cb, userdata) };
 }

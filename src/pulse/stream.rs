@@ -10,8 +10,7 @@ use std::io::IoResult;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use pulse_types::*;
-
+use pulse::types::*;
 
 // Types for callback closures
 pub type PaStreamRequestCallback<'a> = FnMut(PulseAudioStream, size_t) + 'a; // XXX
@@ -24,8 +23,8 @@ mod safe {
     use std::{ptr, mem};
     use std::ffi::CString;
 
-    use ext;
-    use pulse_types::*;
+    use pulse::ext;
+    use pulse::types::*;
     use super::PulseAudioStreamInternal;
 
 
