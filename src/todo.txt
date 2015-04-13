@@ -1,9 +1,0 @@
-- Deinterleave first channel directly into FFT buffer
-- Cast last channel directly out of output buffer
-- Return final casting and channel combining as an iterator
-- Make an iterator that does the scaling to the window size
-- Keep a *mut c_char for each ncurses row and read output iterator directly
-  into this matrix
-- Handle window resizing after these optimizations
-- Make a better algorithm for scaling to window size (so we get exact columns)
-- Print frequencies on bottom of visualizer
