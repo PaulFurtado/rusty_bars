@@ -1,4 +1,3 @@
-#![feature(unsafe_destructor)]
 #![allow(unstable)]
 #![allow(dead_code)]
 

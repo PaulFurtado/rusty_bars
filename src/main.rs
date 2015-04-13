@@ -20,6 +20,32 @@ macro_rules! println_stderr(
 );
 
 
+struct VizRunner {
+    mainloop: PulseAudioMainloop,
+    context: Context,
+    fft: fftw_wrapper::AudioFft,
+    viz: visualizer::Visualizer
+}
+
+
+impl VizRunner {
+    pub fn new() -> VizRunner {
+        let mainloop = PulseAudioMainloop::new();
+        let context = mainloop.create_context("rs_client");
+
+        VizRunner {
+            mainloop: mainloop,
+            context: context,
+            fft: fftw_wrapper::AudioFft::new(1024, 2),
+            viz: visualizer::Visualizer::new()
+        }
+    }
+
+
+}
+
+
+
 
 
 fn main() {

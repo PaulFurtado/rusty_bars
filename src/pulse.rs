@@ -1,22 +1,17 @@
-#![feature(unsafe_destructor)]
 #![allow(unstable)]
-#![allow(dead_code)]
 
 
 extern crate libc;
 use self::libc::funcs::c95::string::strlen;
-use self::libc::{c_int, c_char, c_void, size_t};
+use self::libc::{c_int, c_char, c_void};
 
 use ext;
 
 
 use std::ffi::CString;
 use std::ptr;
-use std::mem;
-use std::fmt;
-use std::slice;
+
 use std::sync::{Arc, Mutex};
-use std::io::{Reader, Writer, IoResult, IoError, IoErrorKind};
 
 use pulse_types::*;
 pub use stream;
@@ -137,16 +132,6 @@ impl Context {
         context
     }
 
-    /// Get a mutable raw pointer to this object
-    fn as_mut_ptr(&mut self) -> *mut Context {
-        self
-    }
-
-    /// Get a mutable void pointer to this object
-    fn as_void_ptr(&mut self) -> *mut c_void {
-        self.as_mut_ptr() as *mut c_void
-    }
-
     /// Set the callback for server state. This callback gets called many times.
     /// Do not start sending commands until this returns pa_context_state::READY
     pub fn set_state_callback<C>(&mut self, cb: C) where C: FnMut(Context, pa_context_state) + Send {
@@ -225,7 +210,7 @@ impl Context {
     ///    map: the desired channel
     pub fn create_stream(&self, name: &str, ss: &pa_sample_spec, map: Option<&pa_channel_map>) -> PulseAudioStream {
         let internal_guard = self.internal.lock();
-        let mut internal = internal_guard.unwrap();
+        let internal = internal_guard.unwrap();
 
         let channel_map_ptr: *const pa_channel_map = match map {
             Some(map) => map,
@@ -282,11 +267,6 @@ impl ContextInternal {
             context_success_cb: None,
             subscriptions: SubscriptionManager::new()
         }
-    }
-
-    /// Gets a new clone of the external API
-    fn get_new_external(&self) -> Context {
-        self.external.clone().unwrap()
     }
 
     /// Get the current context state. This function is synchronous.
