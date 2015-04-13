@@ -288,12 +288,14 @@ fn main() {
 
                                 stream.set_read_callback(move |mut stream, nbytes| {
                                     //let foo: &[u8] = stream.peek().unwrap();
-                                    println!("called....");
+
+                                    println!("read callback called. {} bytes available", nbytes);
                                     match stream.peek() {
                                         Ok(data) => println!("Data: {:?}", data),
                                         Err(_) => return
                                     }
 
+                                    stream.drop_fragment().unwrap();
 
                                     //fft.feed_u8_data(stream.peek().unwrap());
                                     //fft.execute();
