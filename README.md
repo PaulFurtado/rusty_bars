@@ -1,7 +1,10 @@
 rusty_bars
 ----------
 
-A PulseAudio music visualizer written in Rust.
+A text-bassed PulseAudio music visualizer written in Rust.
+
+![](https://raw.githubusercontent.com/PaulFurtado/rusty_bars/master/rusty_bars_screenshot.png)
+
 
 Usage
 -----
