@@ -1,83 +1,57 @@
-rust_pulse
+rusty_bars
 ----------
 
-A PulseAudio visualizer written in Rust.
+A PulseAudio music visualizer written in Rust.
 
 Usage:
-    rust_pulse takes no arguments. At startup it detects the current PulseAudio
-    output device and begins visualizing its output. If the system's audio
-    output changes, the visualizer will change automatically.
+    rusty_bars takes no arguments. At startup it detects the current PulseAudio
+    output device and begins visualizing its output. If the system's default
+    audio output changes, the visualizer will change automatically.
 
+Description:
+    This is a text-based audio visualizer that runs in your terminal. It reads
+    audio from your system's default audio output, runs an FFT on it using the
+    FFTW library, and displays the visual using ncurses.
 
-Files:
+Building:
+    Simply run "cargo build". This project depends on libpulse, ncurses, and
+    FFTW, however these packages are likely already installed on any desktop
+    linux distribution.
 
-src/
-    The main source code directory
+Background:
+    This was our final project for the course "Building Extensible Systems" at
+    Northeastern University, an experimental course in Rust taught by Jesse Tov
+    and Matthias Felleisen. Ali Ukani was my partner. The purpose of this
+    project was to experiment with the foreign function interface.
 
-    main.rs
-        The entry point of rust_pulse
+    Ali: http://ali.io/  https://github.com/ali
+    The course: http://www.ccs.neu.edu/home/matthias/4620-s15/index.html
 
-    lib.rs
-        Glue for the rust_pulse crate
+OS X:
+    There's a chance that this works on OS X using the PulseAudio OS X port,
+    however, we haven't tried it. It would be cool to make this work on OS X
+    using soundflower to get audio data.
 
-    ncurses_wrapper.rs
-        A wrapper around a small subset of ncurses' features used by the visualizer
+Other notes:
+    One of the goals of this project is to use this code to drive LED
+    visualizations. We've done a good deal of this in Python, but Rust is
+    lower-level and can provide better latency, especially when running on
+    embedded devices with limited CPUs.
 
-    visualizer.rs
-        Code for rendering the visualizer
+    The PulseAudio wrapping code in this is pretty dirty. The PulseAudio C API
+    is entirely async and we wanted to use Rust closures for the callbacks.
+    Our implementation involves circular references and reference counters,
+    drop is not properly implemented on any of the structs, and none of it is
+    thread safe. If I have time, I'm definitely interested in cleaning up this
+    code and building a PulseAudio crate since this would open up Rust to be
+    used by audio applications for linux.
 
-    viz_runner.rs
-        The culmination of all parts. Pulls data from PulseAudio, pumps it
-        through the FFT, and hands it off to the renderer.
+    The FFTW wrapping code is fairly clean and provides a realistic abstraction
+    over FFTW plans. It currently only supports the fftw_plan_dft_r2c_1d plan
+    function, but it would be trivial to support the rest of them. I'm planning
+    to build an FFTW crate when I get a chance.
 
-    fftw/
-        A module which wraps the FFTW C library.
-
-        ext.rs
-            External functions from the FFTW C library.
-
-        types.rs
-            Implementations of FFTW's C types in Rust
-
-        alligned_array.rs
-            A wrapper around FFTW's properly-aligned arrays for SIMD instructions.
-
-        hanning.rs
-            An implementation of the Hanning Window Function which caches some
-            of the work.
-
-        plan.rs
-            A wrapper around an FFTW plan. A plan is the core of the FFTW
-            library and is responsible for executing the FFTs.
-
-        multichannel.rs
-            A wrapper around multiple plans, for executing plans on multiple
-            channels of input data.
-
-        audio.rs
-            A wrapper around multichannel plans specialized for S16LE audio data
-
-    pulse/
-        Wrappers for PulseAudio objects
-
-        ext.rs
-            External functions from the libpulseaudio C library
-
-        types.rs
-            Implementations of PulseAudio's C types
-
-        mainloop.rs
-            A wrapper around the PulseAudio mainloop
-
-        context.rs
-            A wrapper around a PulseAudio context. A context represents a
-            connection to a PulseAudio server
-
-        stream.rs
-            A wrapper around a PulseAudio stream
-
-        subscription_manager.rs
-            A helper for working with enum masks for PulseAudio event subscriptions
-
-        mod.rs
-            Glue for the pulse module
+    Our FFT-related math may not be totally correct; when we first started this,
+    we had no idea how to use FFTs, but watching the visualizer while playing
+    tones in a tone generator seems to confirm that it is mostyl correct. If
+    you notice anything wrong, please tell us!
