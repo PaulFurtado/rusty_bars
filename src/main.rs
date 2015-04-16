@@ -1,10 +1,10 @@
 #![allow(unstable)]
 
 extern crate libc;
-extern crate rust_pulse;
+extern crate rusty_bars;
 
-use rust_pulse::pulse::PulseAudioMainloop;
-use rust_pulse::viz_runner::VizRunner;
+use rusty_bars::pulse::PulseAudioMainloop;
+use rusty_bars::viz_runner::VizRunner;
 
 /// Start the visualizer for your default PulseAudio output.
 fn main() {
