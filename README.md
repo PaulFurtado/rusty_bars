@@ -20,9 +20,9 @@ FFTW library, and displays the visual using ncurses.
 
 Building
 --------
-Simply run "cargo build". This project depends on libpulse, ncurses, and
-FFTW, however these packages are likely already installed on any desktop
-linux distribution.
+Simply run "cargo build" using rust alpha (the original alpha, not alpha 2).
+This project depends on libpulse, ncurses, and FFTW, however these packages
+are likely already installed on any desktop linux distribution.
 
 Background
 ----------
