@@ -73,15 +73,12 @@ impl<T: Copy> FftwAlignedArray<T> {
 
     /// Modify the contents of this array via a mutable slice
     pub fn as_mut_slice<'a>(&'a mut self) -> &'a mut [T] {
-        unsafe{ slice::from_raw_mut_buf(&self.mut_ptr, self.len) }
+        unsafe{ slice::from_raw_parts_mut(&self.mut_ptr, self.len) }
     }
-}
 
-
-impl<T> AsSlice<T> for FftwAlignedArray<T> {
     /// Access the contents of this array via an immutable slice
     fn as_slice(&self) -> &[T] {
-        unsafe{ slice::from_raw_buf(&self.ptr, self.len) }
+        unsafe{ slice::from_raw_parts(&self.ptr, self.len) }
     }
 }
 

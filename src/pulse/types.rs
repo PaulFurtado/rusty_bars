@@ -200,15 +200,15 @@ pub mod enums {
     #[repr(C)]
     #[derive(Copy)]
     pub enum pa_sink_flags_t {
-        PA_SINK_NOFLAGS = 0x0000is,
-        PA_SINK_HW_VOLUME_CTRL = 0x0001is,
-        PA_SINK_LATENCY = 0x0002is,
-        PA_SINK_HARDWARE = 0x0004is,
-        PA_SINK_NETWORK = 0x0008is,
-        PA_SINK_HW_MUTE_CTRL = 0x0010is,
-        PA_SINK_DECIBEL_VOLUME = 0x0020is,
-        PA_SINK_FLAT_VOLUME = 0x0040is,
-        PA_SINK_DYNAMIC_LATENCY = 0x0080is,
+        PA_SINK_NOFLAGS = 0x0000isize,
+        PA_SINK_HW_VOLUME_CTRL = 0x0001isize,
+        PA_SINK_LATENCY = 0x0002isize,
+        PA_SINK_HARDWARE = 0x0004isize,
+        PA_SINK_NETWORK = 0x0008isize,
+        PA_SINK_HW_MUTE_CTRL = 0x0010isize,
+        PA_SINK_DECIBEL_VOLUME = 0x0020isize,
+        PA_SINK_FLAT_VOLUME = 0x0040isize,
+        PA_SINK_DYNAMIC_LATENCY = 0x0080isize,
     }
 
     #[repr(C)]
@@ -472,7 +472,7 @@ pub mod structs {
     /// Turn a raw c pointer with a life time into an &str
     fn get_str<'a>(c_buf: &'a *const c_char) -> &'a str {
         let len = unsafe{ strlen(*c_buf) } as usize;
-        let slice: &[c_char] = unsafe{ slice::from_raw_buf(c_buf, len) };
+        let slice: &[c_char] = unsafe{ slice::from_raw_parts(c_buf, len) };
         str::from_utf8(unsafe{ mem::transmute(slice) }).unwrap()
     }
 

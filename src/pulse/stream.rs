@@ -6,7 +6,7 @@ extern crate libc;
 use self::libc::{c_int, c_void, size_t};
 
 use std::{ptr, slice};
-use std::io::IoResult;
+//use std::io::IoResult;
 use std::rc::Rc;
 use std::cell::RefCell;
 
@@ -15,6 +15,9 @@ use pulse::types::*;
 // Types for callback closures
 pub type PaStreamRequestCallback<'a> = FnMut(PulseAudioStream, size_t) + 'a; // XXX
 pub type BoxedPaStreamRequestCallback<'a> = Box<PaStreamRequestCallback<'a>>;
+
+pub type IoResult<T>=Result<T, String>;
+
 
 
 mod safe {
@@ -257,7 +260,7 @@ impl<'a> PulseAudioStream<'a> {
 
         self._last_ptr = buf as *const u8;
         unsafe {
-            Ok(slice::from_raw_buf(&self._last_ptr, nbytes as usize))
+            Ok(slice::from_raw_parts(&self._last_ptr, nbytes as usize))
         }
     }
 

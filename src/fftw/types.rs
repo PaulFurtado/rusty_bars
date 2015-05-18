@@ -1,6 +1,6 @@
 #![allow(unstable)]
 
-use std::num::Float;
+//use std::num::Float;
 
 
 #[repr(C)]
