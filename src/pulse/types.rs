@@ -129,8 +129,7 @@ pub mod enums {
     }
 
     #[repr(C)]
-    #[derive(Copy)]
-    pub enum pa_channel_position_t {
+        pub enum pa_channel_position_t {
         INVALID,
         MONO,
         FRONT_LEFT,
@@ -187,8 +186,7 @@ pub mod enums {
     }
 
     #[repr(C)]
-    #[derive(Copy)]
-    pub enum pa_sink_state_t {
+        pub enum pa_sink_state_t {
         PA_SINK_INVALID_STATE = -1,
         PA_SINK_RUNNING = 0,
         PA_SINK_IDLE = 1,
@@ -198,8 +196,7 @@ pub mod enums {
     }
 
     #[repr(C)]
-    #[derive(Copy)]
-    pub enum pa_sink_flags_t {
+        pub enum pa_sink_flags_t {
         PA_SINK_NOFLAGS = 0x0000isize,
         PA_SINK_HW_VOLUME_CTRL = 0x0001isize,
         PA_SINK_LATENCY = 0x0002isize,
@@ -212,8 +209,7 @@ pub mod enums {
     }
 
     #[repr(C)]
-    #[derive(Copy)]
-    pub enum pa_encoding_t {
+        pub enum pa_encoding_t {
         PA_ENCODING_ANY,
         PA_ENCODING_PCM,
         PA_ENCODING_AC3_IEC61937,
@@ -226,8 +222,7 @@ pub mod enums {
     }
 
     #[repr(C)]
-    #[derive(Copy)]
-    pub enum pa_subscription_event_type {
+        pub enum pa_subscription_event_type {
         SINK = 0x0000,
         SOURCE = 0x0001,
         SINK_INPUT = 0x0002,
@@ -248,8 +243,7 @@ pub mod enums {
     }
 
     #[repr(C)]
-    #[derive(Copy)]
-    pub enum pa_subscription_mask {
+        pub enum pa_subscription_mask {
         NULL = 0x0000,
         SINK = 0x0001,
         SOURCE = 0x0002,
@@ -264,8 +258,7 @@ pub mod enums {
     }
 
     #[repr(C)]
-    #[derive(Copy)]
-    pub enum pa_stream_flags_t {
+        pub enum pa_stream_flags_t {
         /// Default option -- no flags necessary.
         PA_STREAM_NOFLAGS = 0x0000,
         /// Starts the stream as "corked", requiring it to be uncorked before
@@ -339,8 +332,7 @@ pub mod structs {
     use super::enums::*;
     use super::opaque::*;
 
-    #[derive(Copy)]
-    #[repr(C)]
+        #[repr(C)]
     pub struct pa_sample_spec {
       pub format: pa_sample_format,
       pub rate: u32,
@@ -348,22 +340,19 @@ pub mod structs {
     }
 
     #[repr(C)]
-    #[derive(Copy)]
-    pub struct pa_cvolume {
+        pub struct pa_cvolume {
         channels: u8,
         values: [pa_volume_t; 32]
     }
 
     #[repr(C)]
-    #[derive(Copy)]
-    pub struct pa_channel_map {
+        pub struct pa_channel_map {
         channels: u8,
         values: [pa_channel_position_t; 32]
     }
 
     #[repr(C)]
-    #[derive(Copy)]
-    pub struct pa_sink_info<'a> {
+        pub struct pa_sink_info {
         pub name: *const c_char,               //**< Name of the sink */
         pub index: u32,                        //**< Index of the sink */
         pub description: *const c_char,  //**< Description of this sink */
@@ -394,8 +383,7 @@ pub mod structs {
     }
 
     #[repr(C)]
-    #[derive(Copy)]
-    pub struct pa_server_info<'a> {
+        pub struct pa_server_info {
         pub user_name: *const c_char,
         pub host_name: *const c_char,
         pub server_version: *const c_char,
@@ -408,15 +396,13 @@ pub mod structs {
     }
 
     #[repr(C)]
-    #[derive(Copy)]
-    pub struct pa_format_info {
+        pub struct pa_format_info {
         pub encoding: pa_encoding_t,
         pub plist: *mut pa_proplist
     }
 
     #[repr(C)]
-    #[derive(Copy)]
-    pub struct pa_buffer_attr {
+        pub struct pa_buffer_attr {
         pub max_length: u32,
         pub tlength: u32,
         pub prebuf: u32,
@@ -425,7 +411,7 @@ pub mod structs {
     }
 
     /// Impl for making it easy to get string values from pa_server_info
-    impl<'a> pa_server_info<'a> {
+    impl<'a> pa_server_info {
         pub fn get_user_name(&'a self) -> &'a str {
             get_str(&self.user_name)
         }
@@ -451,7 +437,7 @@ pub mod structs {
         }
     }
 
-    impl<'a> pa_sink_info<'a> {
+    impl<'a> pa_sink_info {
         pub fn get_name(&'a self) -> &'a str {
             get_str(&self.name)
         }
