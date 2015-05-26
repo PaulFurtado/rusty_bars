@@ -1,7 +1,6 @@
-#![allow(unstable)]
 
 use std::slice;
-use std::num::Float;
+//use std::num::Float;
 use fftw::multichannel::MultiChannelFft;
 use fftw::hanning::HanningWindowCalculator;
 
@@ -94,7 +93,7 @@ impl AudioFft {
     /// it.
     pub fn feed_u8_data(&mut self, input: &[u8]) -> usize {
         let i16_ptr: *const i16 = input.as_ptr() as *const i16;
-        self.feed_data(unsafe{ slice::from_raw_buf(&i16_ptr, input.len()/2) }) * 2
+        self.feed_data(unsafe{ slice::from_raw_parts(i16_ptr, input.len()/2) }) * 2
     }
 
     /// Computes the combined output of all channels into the output field of
@@ -103,7 +102,7 @@ impl AudioFft {
     pub fn compute_output(&mut self) {
         let mut first = true;
         for channel in self.multichan_fft.channel_plans.iter() {
-            for (index, &value) in channel.get_output_slice().slice_to(self.fft_size/2).iter().enumerate() {
+            for (index, &value) in channel.get_output_slice()[0..self.fft_size/2].iter().enumerate() {
                 // Turn the FFT output value into decibals
                 let power: f64 = 20.0 * value.abs().log10();
                 // If it's bigger than the biggest value for this channel for
@@ -118,6 +117,6 @@ impl AudioFft {
 
     /// Borrow the combined output vector
     pub fn get_output(&self) -> &[f64] {
-        self.output.as_slice()
+        &self.output[..]
     }
 }

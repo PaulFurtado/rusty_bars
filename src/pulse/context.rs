@@ -1,5 +1,3 @@
-#![allow(unstable)]
-
 /// A module for connecting to a PulseAudio server.
 
 extern crate libc;
@@ -59,7 +57,7 @@ impl<'a> Context<'a> {
     /// Do not start sending commands until this returns pa_context_state::READY
     pub fn set_state_callback<C>(&self, cb: C) where C: FnMut(Context, pa_context_state) + 'a {
         let mut internal = self.internal.borrow_mut();
-        internal.state_cb = Some(Box::new(cb) as BoxedStateCallback);
+        internal.state_cb = Some(Box::new(cb));
         pa_context_set_state_callback(internal.ptr, _state_callback, internal.as_void_ptr());
     }
 
@@ -77,7 +75,7 @@ impl<'a> Context<'a> {
     /// for more details.
     pub fn get_server_info<C>(&self, cb: C) where C: FnMut(Context, &pa_server_info) + 'a {
         let mut internal = self.internal.borrow_mut();
-        internal.server_info_cb = Some(Box::new(cb) as BoxedServerInfoCallback);
+        internal.server_info_cb = Some(Box::new(cb));
         pa_context_get_server_info(internal.ptr, _server_info_callback, internal.as_void_ptr());
     }
 
@@ -89,14 +87,14 @@ impl<'a> Context<'a> {
     /// the list.
     pub fn get_sink_info_by_name<C>(&self, name: &str, cb: C) where C: FnMut(Context, Option<&pa_sink_info>) + 'a {
         let mut internal = self.internal.borrow_mut();
-        internal.sink_info_cb = Some(Box::new(cb) as BoxedSinkInfoCallback);
+        internal.sink_info_cb = Some(Box::new(cb));
         pa_context_get_sink_info_by_name(internal.ptr, name, _sink_info_callback, internal.as_void_ptr());
     }
 
     /// Adds an event subscription
     pub fn add_subscription<C>(&self, mask: pa_subscription_mask, cb: C) where C: FnMut(Context, bool) + 'a {
         let mut internal = self.internal.borrow_mut();
-        internal.context_success_cb = Some(Box::new(cb) as BoxedPaContextSuccessCallback);
+        internal.context_success_cb = Some(Box::new(cb));
         internal.subscriptions.add(mask);
         let new_mask = internal.subscriptions.get_mask();
         pa_context_subscribe(internal.ptr, new_mask, _subscription_success_callback, internal.as_void_ptr());
@@ -105,7 +103,7 @@ impl<'a> Context<'a> {
     /// Removes an event subscription
     pub fn remove_subscription<C>(&self, mask: pa_subscription_mask, cb: C) where C: FnMut(Context, bool) + 'a {
         let mut internal = self.internal.borrow_mut();
-        internal.context_success_cb = Some(Box::new(cb) as BoxedPaContextSuccessCallback);
+        internal.context_success_cb = Some(Box::new(cb));
         internal.subscriptions.remove(mask);
         let new_mask = internal.subscriptions.get_mask();
         pa_context_subscribe(internal.ptr, new_mask, _subscription_success_callback, internal.as_void_ptr());
@@ -114,7 +112,7 @@ impl<'a> Context<'a> {
     /// Set the callback for subscriptions
     pub fn set_event_callback<C>(&self, cb: C) where C: FnMut(Context, c_int, u32) + 'a {
         let mut internal = self.internal.borrow_mut();
-        internal.event_cb = Some(Box::new(cb) as BoxedSubscriptionCallback);
+        internal.event_cb = Some(Box::new(cb));
         pa_context_set_subscribe_callback(internal.ptr, _subscription_event_callback, internal.as_void_ptr());
     }
 
@@ -239,7 +237,6 @@ impl<'a> ContextInternal<'a> {
 
 /// Currently the drop method has nothing to trigger it. Need to figure out a
 /// game plan here.
-#[unsafe_destructor]
 impl<'a> Drop for ContextInternal<'a> {
     fn drop(&mut self) {
         // TODO
@@ -263,7 +260,8 @@ fn pa_context_connect(context: *mut opaque::pa_context, server_name: Option<&str
 
     let server: *const c_char = match server_name {
         None => ptr::null(),
-        Some(name) => CString::from_slice(name.as_bytes()).as_ptr()
+        //TODO: use CString here
+        Some(name) => name.as_ptr() as *const i8
     };
 
     let spawn_api_ptr: *const opaque::pa_spawn_api = match spawn_api {
@@ -291,7 +289,8 @@ pub fn pa_context_disconnect(context: *mut opaque::pa_context) {
 /// Gets sink info by the sink's name
 pub fn pa_context_get_sink_info_by_name(c: *mut pa_context, name: &str, cb: pa_sink_info_cb_t, userdata: *mut c_void) {
     assert!(!c.is_null());
-    let name = CString::from_slice(name.as_bytes());
+    let name_vec: Vec<u8> = name.bytes().collect();
+    let name = CString::new(name_vec).unwrap();
     unsafe{ ext::pa_context_get_sink_info_by_name(c, name.as_ptr(), cb, userdata) };
 }
 
@@ -312,7 +311,8 @@ pub fn pa_context_get_server_info(context: *mut opaque::pa_context,
 /// A safe interface to pa_context_new
 pub fn pa_context_new(mainloop_api: *mut opaque::pa_mainloop_api, client_name: &str) -> *mut opaque::pa_context {
     assert!(!mainloop_api.is_null());
-    let client_name_c = CString::from_slice(client_name.as_bytes());
+    let client_name_vec: Vec<u8> = client_name.bytes().collect();
+    let client_name_c = CString::new(client_name_vec).unwrap();
     let context = unsafe{ ext::pa_context_new(mainloop_api, client_name_c.as_ptr()) };
     assert!(!context.is_null());
     return context;

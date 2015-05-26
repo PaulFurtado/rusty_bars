@@ -1,5 +1,3 @@
-#![allow(unstable)]
-
 /// This module contains a Rust interface to PulseAudio's C API.
 
 extern crate libc;
@@ -11,14 +9,14 @@ use pulse::types::*;
 use pulse::context::Context;
 
 /// A struct which wraps the PulseAudio async main loop.
-pub struct PulseAudioMainloop<'a> {
+pub struct PulseAudioMainloop {
     internal: *mut pa_mainloop
 }
 
 
-impl<'a> PulseAudioMainloop<'a> {
+impl<'a> PulseAudioMainloop {
     /// Create a new mainloop.
-    pub fn new() -> PulseAudioMainloop<'a> {
+    pub fn new() -> PulseAudioMainloop {
         PulseAudioMainloop{
             internal: pa_mainloop_new()
         }

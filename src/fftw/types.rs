@@ -1,16 +1,10 @@
-#![allow(unstable)]
-
-use std::num::Float;
-
 
 #[repr(C)]
-#[derive(Copy)]
 /// An opaque pointer to an FFTW C plan
 pub struct fftw_plan;
 
 
 #[repr(C)]
-#[derive(Copy)]
 /// Thse can be found in fftw/api/fftw2.h in the FFW source. In FFTW, they are
 /// defined with #define.
 /// You can read more about planner flags here:
@@ -29,7 +23,7 @@ pub enum PlannerFlags {
 
 
 #[repr(C)]
-#[derive(Copy)]
+#[derive(Clone, Copy)]
 /// Represents a 64-bit complex number.
 pub struct FftwComplex {
     pub re: f64,

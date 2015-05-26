@@ -1,4 +1,3 @@
-#![allow(unstable)]
 #![allow(missing_copy_implementations)]
 
 extern crate libc;
@@ -40,7 +39,8 @@ impl Window {
 
     /// Add a string to the screen starting at the given location
     pub fn addstr(&mut self, y: c_int, x: c_int, text: &str) -> Result<c_int, c_int> {
-        let c_text = CString::from_slice(text.as_bytes());
+        let text_vec: Vec<u8> = text.bytes().collect();
+        let c_text =  CString::new(text_vec).unwrap();
         handle_err(unsafe{
             ext::mvwaddstr(self.w, y, x, c_text.as_ptr())
         })
@@ -91,7 +91,6 @@ fn handle_err(result: c_int) -> Result<c_int, c_int> {
 
 
 mod ext {
-    #![allow(unstable)]
     /// Module for external ncurses functions and types
 
     extern crate libc;

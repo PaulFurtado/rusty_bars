@@ -1,6 +1,6 @@
 
 use std::f64::consts::PI;
-use std::num::Float;
+//use std::num::Float;
 
 
 /// Precomputes the multipliers for the hanning window function so computing

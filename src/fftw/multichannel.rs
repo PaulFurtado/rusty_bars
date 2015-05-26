@@ -1,5 +1,3 @@
-#![allow(unstable)]
-
 use fftw::plan::*;
 
 
