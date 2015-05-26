@@ -1,5 +1,3 @@
-#![allow(unstable)]
-
 /// A module for subscribing to events on a PulseAudio server.
 
 extern crate libc;

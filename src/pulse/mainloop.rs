@@ -1,5 +1,3 @@
-#![allow(unstable)]
-
 /// This module contains a Rust interface to PulseAudio's C API.
 
 extern crate libc;

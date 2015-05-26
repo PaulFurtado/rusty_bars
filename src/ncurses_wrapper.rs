@@ -1,4 +1,3 @@
-#![allow(unstable)]
 #![allow(missing_copy_implementations)]
 
 extern crate libc;
@@ -92,7 +91,6 @@ fn handle_err(result: c_int) -> Result<c_int, c_int> {
 
 
 mod ext {
-    #![allow(unstable)]
     /// Module for external ncurses functions and types
 
     extern crate libc;

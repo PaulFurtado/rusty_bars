@@ -1,4 +1,3 @@
-#![allow(unstable)]
 
 extern crate libc;
 use fftw::types::*;

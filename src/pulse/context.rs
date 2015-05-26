@@ -1,5 +1,3 @@
-#![allow(unstable)]
-
 /// A module for connecting to a PulseAudio server.
 
 extern crate libc;

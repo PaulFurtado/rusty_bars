@@ -1,4 +1,3 @@
-#![allow(unstable)]
 
 extern crate libc;
 use self::libc::{c_int, size_t, c_void};

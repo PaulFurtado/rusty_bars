@@ -1,5 +1,3 @@
-#![allow(unstable)]
-
 extern crate libc;
 extern crate rusty_bars;
 

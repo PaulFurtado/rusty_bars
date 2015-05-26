@@ -1,7 +1,3 @@
-#![allow(unstable)]
-
-//use std::num::Float;
-
 
 #[repr(C)]
 /// An opaque pointer to an FFTW C plan

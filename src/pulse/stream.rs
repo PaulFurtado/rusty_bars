@@ -1,4 +1,3 @@
-#![allow(unstable)]
 #![allow(raw_pointer_derive)]
 
 extern crate libc;
@@ -89,9 +88,7 @@ mod safe {
                 let name_vec: Vec<u8> = name.bytes().collect();
                 let cstr = CString::new(name_vec).unwrap();
                 let cstr_ptr = cstr.as_ptr();
-                unsafe{
-                    mem::forget(cstr);
-                }
+                mem::forget(cstr);
                 cstr_ptr
             }
         };
@@ -189,7 +186,7 @@ impl<'a> Drop for PulseAudioStreamInternal<'a> {
 
 /// Represents errors that could occur while reading data from a
 /// PulseAudioStream.
-#[derive(Copy, PartialEq, Eq, Clone, Show)]
+#[derive(Copy, PartialEq, Eq, Clone)]
 pub enum PeekError {
     /// The input buffer is empty.
     BufferEmpty,

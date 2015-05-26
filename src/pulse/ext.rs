@@ -1,4 +1,3 @@
-#![allow(unstable)]
 #![allow(dead_code)]
 
 extern crate libc;

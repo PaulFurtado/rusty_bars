@@ -1,4 +1,3 @@
-#![allow(unstable)]
 
 use std::slice;
 //use std::num::Float;

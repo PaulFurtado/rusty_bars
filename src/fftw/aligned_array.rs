@@ -1,10 +1,8 @@
-#![allow(unstable)]
 
 extern crate libc;
 use self::libc::{size_t, c_void};
 use std::{mem, slice};
 use fftw::ext;
-use std::ops::{Index, IndexMut, Deref};
 
 
 /// Wrapper around fftw_malloc which automatically allocates the right amount of
