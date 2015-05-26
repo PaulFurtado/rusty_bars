@@ -57,7 +57,7 @@ impl FftwPlan {
     /// Get a slice of the FFTW plan's output buffer
     pub fn get_output_slice<'a>(&'a self) -> &'a [FftwComplex] {
         // A real FFT outputs half of the input size.
-        self.output.as_slice().slice_to(self.size/2)
+        &self.output.as_slice()[0..(self.size/2)]
     }
 }
 

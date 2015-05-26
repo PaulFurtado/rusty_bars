@@ -27,6 +27,7 @@ pub enum PlannerFlags {
 
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 /// Represents a 64-bit complex number.
 pub struct FftwComplex {
     pub re: f64,

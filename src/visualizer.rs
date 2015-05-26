@@ -62,7 +62,7 @@ pub fn scale_fft_output(input: &[f64], new_len: usize) -> Vec<f64> {
 fn get_min_max<'a, I: Iterator<Item=&'a f64>>(iter: &'a mut I) -> (f64, f64) {
     let mut min: f64 = 0.0;
     let mut max: f64 = 0.0;
-    for &x in *iter {
+    for &x in iter {
         if x < min {
             min = x;
         }
@@ -200,7 +200,7 @@ impl Visualizer {
 
         // Add some info so you can see the decisions it's making
         let debuginfo = format!(" width: {}, height: {}, bars: {} ", self.width, self.height, scaled.len());
-        let _ = self.win.addstr(0, (self.width - debuginfo.len()) as c_int, debuginfo.as_slice());
+        let _ = self.win.addstr(0, (self.width - debuginfo.len()) as c_int, &debuginfo[..]);
 
         // Calling refresh makes it actually take effect
         try!(self.win.refresh());

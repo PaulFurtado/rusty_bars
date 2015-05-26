@@ -458,7 +458,7 @@ pub mod structs {
     /// Turn a raw c pointer with a life time into an &str
     fn get_str<'a>(c_buf: &'a *const c_char) -> &'a str {
         let len = unsafe{ strlen(*c_buf) } as usize;
-        let slice: &[c_char] = unsafe{ slice::from_raw_parts(c_buf, len) };
+        let slice: &[c_char] = unsafe{ slice::from_raw_parts(*c_buf, len) };
         str::from_utf8(unsafe{ mem::transmute(slice) }).unwrap()
     }
 

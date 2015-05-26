@@ -91,7 +91,6 @@ mod safe {
                 let cstr_ptr = cstr.as_ptr();
                 unsafe{
                     mem::forget(cstr);
-                    mem::forget(name_vec);
                 }
                 cstr_ptr
             }
@@ -182,7 +181,6 @@ impl<'a> PulseAudioStreamInternal<'a> {
     }
 }
 
-#[unsafe_destructor] // unsafe because of the lifetimes
 impl<'a> Drop for PulseAudioStreamInternal<'a> {
     fn drop(&mut self) {
         safe::pa_stream_disconnect(self.pa_stream);

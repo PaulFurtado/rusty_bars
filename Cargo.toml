@@ -3,3 +3,7 @@
 name = "rusty_bars"
 version = "0.0.1"
 authors = ["Paul Furtado <paulfurtado91@gmail.com>"]
+
+
+[dependencies]
+libc = "0.1.8"

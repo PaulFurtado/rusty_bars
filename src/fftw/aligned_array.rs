@@ -4,6 +4,7 @@ extern crate libc;
 use self::libc::{size_t, c_void};
 use std::{mem, slice};
 use fftw::ext;
+use std::ops::{Index, IndexMut, Deref};
 
 
 /// Wrapper around fftw_malloc which automatically allocates the right amount of
@@ -71,19 +72,19 @@ impl<T: Copy> FftwAlignedArray<T> {
         self.mut_ptr
     }
 
+
     /// Modify the contents of this array via a mutable slice
     pub fn as_mut_slice<'a>(&'a mut self) -> &'a mut [T] {
-        unsafe{ slice::from_raw_parts_mut(&self.mut_ptr, self.len) }
+        unsafe{ slice::from_raw_parts_mut(self.mut_ptr, self.len) }
     }
 
     /// Access the contents of this array via an immutable slice
-    fn as_slice(&self) -> &[T] {
-        unsafe{ slice::from_raw_parts(&self.ptr, self.len) }
+    pub fn as_slice(&self) -> &[T] {
+        unsafe{ slice::from_raw_parts(self.ptr, self.len) }
     }
 }
 
 
-#[unsafe_destructor]
 /// Unsafe because it has lifetimes.
 impl<T> Drop for FftwAlignedArray<T> {
     /// Free the array with the right deallocator

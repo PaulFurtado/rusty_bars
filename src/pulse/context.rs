@@ -239,7 +239,6 @@ impl<'a> ContextInternal<'a> {
 
 /// Currently the drop method has nothing to trigger it. Need to figure out a
 /// game plan here.
-#[unsafe_destructor]
 impl<'a> Drop for ContextInternal<'a> {
     fn drop(&mut self) {
         // TODO
