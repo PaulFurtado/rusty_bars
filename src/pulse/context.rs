@@ -263,7 +263,8 @@ fn pa_context_connect(context: *mut opaque::pa_context, server_name: Option<&str
 
     let server: *const c_char = match server_name {
         None => ptr::null(),
-        Some(name) => CString::from_slice(name.as_bytes()).as_ptr()
+        //TODO: use CString here
+        Some(name) => name.as_ptr() as *const i8
     };
 
     let spawn_api_ptr: *const opaque::pa_spawn_api = match spawn_api {
@@ -291,7 +292,8 @@ pub fn pa_context_disconnect(context: *mut opaque::pa_context) {
 /// Gets sink info by the sink's name
 pub fn pa_context_get_sink_info_by_name(c: *mut pa_context, name: &str, cb: pa_sink_info_cb_t, userdata: *mut c_void) {
     assert!(!c.is_null());
-    let name = CString::from_slice(name.as_bytes());
+    let name_vec: Vec<u8> = name.bytes().collect();
+    let name = CString::new(name_vec).unwrap();
     unsafe{ ext::pa_context_get_sink_info_by_name(c, name.as_ptr(), cb, userdata) };
 }
 
@@ -312,7 +314,8 @@ pub fn pa_context_get_server_info(context: *mut opaque::pa_context,
 /// A safe interface to pa_context_new
 pub fn pa_context_new(mainloop_api: *mut opaque::pa_mainloop_api, client_name: &str) -> *mut opaque::pa_context {
     assert!(!mainloop_api.is_null());
-    let client_name_c = CString::from_slice(client_name.as_bytes());
+    let client_name_vec: Vec<u8> = client_name.bytes().collect();
+    let client_name_c = CString::new(client_name_vec).unwrap();
     let context = unsafe{ ext::pa_context_new(mainloop_api, client_name_c.as_ptr()) };
     assert!(!context.is_null());
     return context;

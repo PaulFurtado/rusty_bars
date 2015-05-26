@@ -54,7 +54,8 @@ mod safe {
     /// Create a new pa_stream
     pub fn pa_stream_new(c: *mut opaque::pa_context, name: &str, ss: *const pa_sample_spec, map: *const pa_channel_map) -> *mut opaque::pa_stream {
         assert!(!c.is_null());
-        let name = CString::from_slice(name.as_bytes());
+        let name_vec: Vec<u8> = name.bytes().collect();
+        let name = CString::new(name_vec).unwrap();
         let res = unsafe { ext::stream::pa_stream_new(c, name.as_ptr(), ss, map) };
         assert!(!res.is_null());
         res
@@ -85,9 +86,13 @@ mod safe {
         let dev: *const c_char = match source_name {
             None => ptr::null(),
             Some(name) => {
-                let cstr = CString::from_slice(name.as_bytes());
+                let name_vec: Vec<u8> = name.bytes().collect();
+                let cstr = CString::new(name_vec).unwrap();
                 let cstr_ptr = cstr.as_ptr();
-                unsafe{ mem::forget(cstr) };
+                unsafe{
+                    mem::forget(cstr);
+                    mem::forget(name_vec);
+                }
                 cstr_ptr
             }
         };
@@ -260,7 +265,7 @@ impl<'a> PulseAudioStream<'a> {
 
         self._last_ptr = buf as *const u8;
         unsafe {
-            Ok(slice::from_raw_parts(&self._last_ptr, nbytes as usize))
+            Ok(slice::from_raw_parts(self._last_ptr, nbytes as usize))
         }
     }
 
