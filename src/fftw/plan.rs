@@ -71,7 +71,7 @@ impl Drop for FftwPlan {
 
 /// Determine if a number is a power of two
 fn is_power_of_two(x: usize) -> bool {
-    (x != 0) && ((x & (x - 1)) == 0)
+    (x != 0) && (x != 1) && ((x & (x - 1)) == 0)
 }
 
 
