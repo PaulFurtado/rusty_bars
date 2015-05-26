@@ -59,7 +59,7 @@ impl<'a> Context<'a> {
     /// Do not start sending commands until this returns pa_context_state::READY
     pub fn set_state_callback<C>(&self, cb: C) where C: FnMut(Context, pa_context_state) + 'a {
         let mut internal = self.internal.borrow_mut();
-        internal.state_cb = Some(Box::new(cb) as BoxedStateCallback);
+        internal.state_cb = Some(Box::new(cb));
         pa_context_set_state_callback(internal.ptr, _state_callback, internal.as_void_ptr());
     }
 
@@ -77,7 +77,7 @@ impl<'a> Context<'a> {
     /// for more details.
     pub fn get_server_info<C>(&self, cb: C) where C: FnMut(Context, &pa_server_info) + 'a {
         let mut internal = self.internal.borrow_mut();
-        internal.server_info_cb = Some(Box::new(cb) as BoxedServerInfoCallback);
+        internal.server_info_cb = Some(Box::new(cb));
         pa_context_get_server_info(internal.ptr, _server_info_callback, internal.as_void_ptr());
     }
 
@@ -89,14 +89,14 @@ impl<'a> Context<'a> {
     /// the list.
     pub fn get_sink_info_by_name<C>(&self, name: &str, cb: C) where C: FnMut(Context, Option<&pa_sink_info>) + 'a {
         let mut internal = self.internal.borrow_mut();
-        internal.sink_info_cb = Some(Box::new(cb) as BoxedSinkInfoCallback);
+        internal.sink_info_cb = Some(Box::new(cb));
         pa_context_get_sink_info_by_name(internal.ptr, name, _sink_info_callback, internal.as_void_ptr());
     }
 
     /// Adds an event subscription
     pub fn add_subscription<C>(&self, mask: pa_subscription_mask, cb: C) where C: FnMut(Context, bool) + 'a {
         let mut internal = self.internal.borrow_mut();
-        internal.context_success_cb = Some(Box::new(cb) as BoxedPaContextSuccessCallback);
+        internal.context_success_cb = Some(Box::new(cb));
         internal.subscriptions.add(mask);
         let new_mask = internal.subscriptions.get_mask();
         pa_context_subscribe(internal.ptr, new_mask, _subscription_success_callback, internal.as_void_ptr());
@@ -105,7 +105,7 @@ impl<'a> Context<'a> {
     /// Removes an event subscription
     pub fn remove_subscription<C>(&self, mask: pa_subscription_mask, cb: C) where C: FnMut(Context, bool) + 'a {
         let mut internal = self.internal.borrow_mut();
-        internal.context_success_cb = Some(Box::new(cb) as BoxedPaContextSuccessCallback);
+        internal.context_success_cb = Some(Box::new(cb));
         internal.subscriptions.remove(mask);
         let new_mask = internal.subscriptions.get_mask();
         pa_context_subscribe(internal.ptr, new_mask, _subscription_success_callback, internal.as_void_ptr());
@@ -114,7 +114,7 @@ impl<'a> Context<'a> {
     /// Set the callback for subscriptions
     pub fn set_event_callback<C>(&self, cb: C) where C: FnMut(Context, c_int, u32) + 'a {
         let mut internal = self.internal.borrow_mut();
-        internal.event_cb = Some(Box::new(cb) as BoxedSubscriptionCallback);
+        internal.event_cb = Some(Box::new(cb));
         pa_context_set_subscribe_callback(internal.ptr, _subscription_event_callback, internal.as_void_ptr());
     }
 
