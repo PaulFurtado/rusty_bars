@@ -20,7 +20,7 @@ FFTW library, and displays the visual using ncurses.
 
 Building
 --------
-Simply run "cargo build" using rust 1.0.
+Simply run "cargo build" using rust 1.3.
 This project depends on libpulse, ncurses, and FFTW, however these packages
 are likely already installed on any desktop linux distribution.
 
