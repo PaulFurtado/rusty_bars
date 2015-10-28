@@ -12,16 +12,16 @@ pub fn endwin() -> Result<(), c_int> {
     let result = unsafe{ ext::endwin() };
     if result == 0 {
         return Ok(())
-    }
-    else {
+    } else {
         return Err(result)
     }
 }
 
+
 /// Wraps an ncruses WINDOW struct with the basic functions for manipulating
 /// the window.
 pub struct Window {
-    w: *mut ext::WINDOW
+    w: *mut ext::Window
 }
 
 
@@ -76,6 +76,12 @@ impl Window {
     /// Set the visibility of the cursor
     pub fn curs_set(&mut self, visibility: c_int) -> Result<c_int, c_int> {
         handle_err(unsafe{ ext::curs_set(visibility) })
+    }
+}
+
+impl Drop for Window {
+    fn drop(&mut self) {
+        endwin().unwrap();
     }
 }
 

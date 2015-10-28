@@ -208,14 +208,4 @@ impl Visualizer {
 }
 
 
-impl Drop for Visualizer {
-    /// Call endwin to clean up the termninal when the Visualizer is dallocated
-    fn drop(&mut self) {
-        match endwin() {
-            _ => {}
-        };
-    }
-}
-
-
 unsafe impl Send for Visualizer {}

@@ -1,8 +1,7 @@
-
 extern crate libc;
-use fftw::types::*;
+use fftw::types::{FftwComplex, PlannerFlags};
 use fftw::ext;
-use fftw::aligned_array::*;
+use fftw::aligned_array::FftwAlignedArray;
 
 
 /// Rust wrapper for an FFTW plan
@@ -10,7 +9,7 @@ pub struct FftwPlan {
     input: FftwAlignedArray<f64>,
     output: FftwAlignedArray<FftwComplex>,
     size: usize,
-    plan: *mut fftw_plan,
+    plan: *mut ext::FftwPlan,
 }
 
 
