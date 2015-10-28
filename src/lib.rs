@@ -1,4 +1,4 @@
-pub mod ncurses_wrapper;
+pub mod ncurses;
 pub mod pulse;
 pub mod visualizer;
 pub mod fftw;

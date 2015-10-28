@@ -1,7 +1,7 @@
 extern crate libc;
 
 use self::libc::{c_int, c_char};
-use ncurses_wrapper::{Window,endwin};
+use ncurses::window::{Window,endwin};
 
 /// The character to use for a bar
 const BAR_CHAR: c_char = '|' as c_char;
