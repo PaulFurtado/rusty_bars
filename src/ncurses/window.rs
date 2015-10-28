@@ -18,6 +18,17 @@ pub fn endwin() -> Result<(), c_int> {
 }
 
 
+/// Initialize the screen and get a window
+fn initscr() -> Result<Window, c_int> {
+    let window = unsafe { ext::initscr() };
+    if window.is_null() {
+        Err(-1)
+    } else {
+        Ok(Window { w: window })
+    }
+}
+
+
 /// Wraps an ncruses WINDOW struct with the basic functions for manipulating
 /// the window.
 pub struct Window {
@@ -26,15 +37,8 @@ pub struct Window {
 
 
 impl Window {
-    /// Initialize the screen and get a window
-    pub fn initscr() -> Result<Window, c_int> {
-        let window = unsafe{ ext::initscr() };
-        if window.is_null() {
-            Err(-1)
-        }
-        else {
-            Ok(Window{w: window})
-        }
+    pub fn new() -> Window {
+        initscr().unwrap()
     }
 
     /// Add a string to the screen starting at the given location
