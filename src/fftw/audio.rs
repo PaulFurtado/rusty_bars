@@ -1,4 +1,3 @@
-
 use std::slice;
 //use std::num::Float;
 use fftw::multichannel::MultiChannelFft;
@@ -31,7 +30,7 @@ impl AudioFft {
     /// Create a new AudioFft
     pub fn new(fft_size: usize, channel_count: usize) -> AudioFft {
         let mut out_vec = Vec::with_capacity(fft_size/2);
-        for _ in (0..fft_size/2) {
+        for _ in 0..fft_size/2 {
             out_vec.push(0.0);
         }
         AudioFft {

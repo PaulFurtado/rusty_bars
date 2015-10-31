@@ -16,7 +16,7 @@ impl HanningWindowCalculator {
         let mut multipliers: Vec<f64> = Vec::with_capacity(fft_size);
         let divider: f64 = (fft_size - 1) as f64;
 
-        for i in (0..fft_size) {
+        for i in 0..fft_size {
             let cos_inner: f64 = 2.0 * PI * (i as f64) / divider;
             let cos_part: f64 = cos_inner.cos();
             let multiplier: f64 = 0.5 * (1.0 - cos_part);
