@@ -17,7 +17,7 @@ impl MultiChannelFft {
     pub fn new(size: usize, channel_count: usize) -> MultiChannelFft {
         let mut channel_plans: Vec<FftwPlan> = Vec::with_capacity(channel_count);
 
-        for _ in (0..channel_count) {
+        for _ in 0..channel_count {
             channel_plans.push(FftwPlan::new(size));
         }
         channel_plans.shrink_to_fit();
