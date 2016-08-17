@@ -1,24 +1,27 @@
 extern crate libc;
 
 use self::libc::{c_int, c_char};
-use ncurses_wrapper::{Window,endwin};
+use ncurses::window::Window;
+
 
 /// The character to use for a bar
 const BAR_CHAR: c_char = '|' as c_char;
 
+
 /// The character to use for rows above the bar
 const EMPTY_CHAR: c_char = ' ' as c_char;
+
 
 /// The character to use where there is a lack of data due to scaling issues.
 /// (If the user sees this character, it is because the visualizer wasn't
 /// properly scaled to the window width)
 const BORDER_CHAR: c_char = ' ' as c_char;
 
+
 /// The character to initialize the row arrays with.
 /// (This is not the same as EMPTY_CHAR so that it is easy to detect that we
 /// didn't draw some part of the screen. Users should never see this.)
 const INIT_CHAR: c_char = '#' as c_char;
-
 
 
 /// Scales down a vector by averaging the elements between the resulting points
@@ -98,10 +101,7 @@ pub struct Visualizer{
 impl Visualizer {
     /// Instantiate a new visualizer. Takes over the terminal with ncurses.
     pub fn new() -> Visualizer {
-        let mut win = match Window::initscr() {
-            Err(_) => panic!("Failed to initialize screen!"),
-            Ok(win) => win
-        };
+        let mut win = Window::new();
 
         // Disable the cursor so it's not moving all around the screen when the
         // animation is rendering.
@@ -204,16 +204,6 @@ impl Visualizer {
         try!(self.win.refresh());
 
         Ok(())
-    }
-}
-
-
-impl Drop for Visualizer {
-    /// Call endwin to clean up the termninal when the Visualizer is dallocated
-    fn drop(&mut self) {
-        match endwin() {
-            _ => {}
-        };
     }
 }
 

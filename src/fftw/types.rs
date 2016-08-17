@@ -1,11 +1,5 @@
-
 #[repr(C)]
-/// An opaque pointer to an FFTW C plan
-pub struct fftw_plan;
-
-
-#[repr(C)]
-/// Thse can be found in fftw/api/fftw2.h in the FFW source. In FFTW, they are
+/// These can be found in fftw/api/fftw2.h in the FFTW source. In FFTW, they are
 /// defined with #define.
 /// You can read more about planner flags here:
 /// http://www.fftw.org/doc/Planner-Flags.html
@@ -29,6 +23,7 @@ pub struct FftwComplex {
     pub re: f64,
     pub im: f64
 }
+
 
 impl FftwComplex {
     /// Get the absolute value (distance from zero) of the complex number

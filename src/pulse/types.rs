@@ -57,22 +57,14 @@ pub mod cb {
 /// For types we only have pointers to. Use structs with names so there is at
 /// least pointer type safety.
 pub mod opaque {
-    #[repr(C)]
-    pub struct pa_mainloop;
-    #[repr(C)]
-    pub struct pa_mainloop_api;
-    #[repr(C)]
-    pub struct pa_context;
-    #[repr(C)]
-    pub struct pa_spawn_api;
-    #[repr(C)]
-    pub struct pa_threaded_mainloop;
-    #[repr(C)]
-    pub struct pa_proplist;
-    #[repr(C)]
-    pub struct pa_stream;
-    #[repr(C)]
-    pub struct pa_operation;
+    pub enum pa_mainloop {}
+    pub enum pa_mainloop_api {}
+    pub enum pa_context {}
+    pub enum pa_spawn_api {}
+    pub enum pa_threaded_mainloop {}
+    pub enum pa_proplist {}
+    pub enum pa_stream {}
+    pub enum pa_operation {}
 }
 
 /// For enum types

@@ -1,9 +1,9 @@
 #![allow(missing_copy_implementations)]
-
 extern crate libc;
 
 use std::ffi::CString;
 use self::libc::{c_int, c_char};
+use ncurses::ext;
 
 
 /// Safe wrapper for the ncurses endwin function. Call this when you are done
@@ -12,29 +12,33 @@ pub fn endwin() -> Result<(), c_int> {
     let result = unsafe{ ext::endwin() };
     if result == 0 {
         return Ok(())
-    }
-    else {
+    } else {
         return Err(result)
     }
 }
 
+
+/// Initialize the screen and get a window
+fn initscr() -> Result<Window, c_int> {
+    let window = unsafe { ext::initscr() };
+    if window.is_null() {
+        Err(-1)
+    } else {
+        Ok(Window { w: window })
+    }
+}
+
+
 /// Wraps an ncruses WINDOW struct with the basic functions for manipulating
 /// the window.
 pub struct Window {
-    w: *mut ext::WINDOW
+    w: *mut ext::Window
 }
 
 
 impl Window {
-    /// Initialize the screen and get a window
-    pub fn initscr() -> Result<Window, c_int> {
-        let window = unsafe{ ext::initscr() };
-        if window.is_null() {
-            Err(-1)
-        }
-        else {
-            Ok(Window{w: window})
-        }
+    pub fn new() -> Window {
+        initscr().unwrap()
     }
 
     /// Add a string to the screen starting at the given location
@@ -79,6 +83,12 @@ impl Window {
     }
 }
 
+impl Drop for Window {
+    fn drop(&mut self) {
+        endwin().unwrap();
+    }
+}
+
 
 /// Turns an ncurses error code into a result so we can toss errors up the stack
 fn handle_err(result: c_int) -> Result<c_int, c_int> {
@@ -86,28 +96,5 @@ fn handle_err(result: c_int) -> Result<c_int, c_int> {
         Err(result)
     } else {
         Ok(result)
-    }
-}
-
-
-mod ext {
-    /// Module for external ncurses functions and types
-
-    extern crate libc;
-    use self::libc::{c_int, c_char};
-
-    #[repr(C)]
-    pub struct WINDOW;
-
-    #[link(name="ncurses")]
-    extern {
-        pub fn initscr() -> *mut WINDOW;
-        pub fn endwin() -> c_int;
-        pub fn wrefresh(win: *mut WINDOW) -> c_int;
-        pub fn mvwaddstr(win: *mut WINDOW, y: c_int, x: c_int, text: *const c_char) -> c_int;
-        pub fn mvwaddnstr(win: *mut WINDOW, y: c_int, x: c_int, text: *const c_char, n: c_int) -> c_int;
-        pub fn getmaxy(win: *mut WINDOW) -> c_int;
-        pub fn getmaxx(win: *mut WINDOW) -> c_int;
-        pub fn curs_set(visibility: c_int) -> c_int;
     }
 }
